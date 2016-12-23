@@ -1,0 +1,9 @@
+
+RubyPost V1.0
+> An elegant Curl wrapper
+
+COMMANDS:
+save [name] : saves request
+load [name] : loads specified request
+get [url]   : makes a get call with specified headers to the url
+post [url]  : posts specified payload with headers to the url
