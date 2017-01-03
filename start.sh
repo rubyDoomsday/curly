@@ -17,15 +17,23 @@ load() {
   cp headers/$1'.list' _headers.list &&
     cp payloads/$1'.json' _payload.json &&
     cp responses/$1'.json' _response.json &&
-    echo > .history &&
-    echo > histor.list &&
     URL=$(cat urls/$1'.string')
 }
 
 alias history="cat history.list"
 
+clear() {
+  > _headers.list &&
+    > _payload.json &&
+    > _response.json &&
+    URL="http://localhost:3000/"
+}
+
 reset() {
-  rm headers/*.* &&
+  > _headers.list &&
+    > _payload.json &&
+    > _response.json &&
+    rm headers/*.* &&
     rm payloads/*.* &&
     rm responses/*.* &&
     URL="http://localhost:3000/"

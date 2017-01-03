@@ -6,6 +6,8 @@ COMMANDS:
 save [name] : saves request
 load [name] : loads specified request
 history     : views save request name log
-get [url]   : makes a get call with specified headers to the url
-post [url]  : posts specified payload with headers to the url
+clear       : clears request param files and URL
+reset       : wipes the slate clean (including history)
+get [url]   : makes a get call with specified headers to the url or saved $URL
+post [url]  : posts specified payload with headers to the url or saved $URL
 $URL=[url]  : paramtize the url string for easy repeat calls
