@@ -5,5 +5,7 @@ RubyPost V1.0
 COMMANDS:
 save [name] : saves request
 load [name] : loads specified request
+history     : views save request name log
 get [url]   : makes a get call with specified headers to the url
 post [url]  : posts specified payload with headers to the url
+$URL=[url]  : paramtize the url string for easy repeat calls
