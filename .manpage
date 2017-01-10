@@ -1,13 +1,22 @@
-
-RubyPost V1.0
+RubyPost V0.1
 > An elegant Curl wrapper
 
 COMMANDS:
-save [name] : saves request
-load [name] : loads specified request
-history     : views save request name log
-clear       : clears request param files and URL
-reset       : wipes the slate clean (including history)
-get [url]   : makes a get call with specified headers to the url or saved $URL
-post [url]  : posts specified payload with headers to the url or saved $URL
-$URL=[url]  : paramtize the url string for easy repeat calls
+  rubypost_help       : displays this menu
+
+# SETTINGS
+  $URL=[url]          : parametize the url string for easy repeat calls
+  save_request [name] : saves request
+  load_request [name] : loads specified request
+  clear_request       : clears request param files and URL
+  history             : views save request name log
+  payload             : views contents of _payload.json
+  headers             : views contents of _headers.list
+
+# OPERATIONS
+  get [url]           : makes a get call with specified headers to the url or saved $URL
+  post [url]          : posts specified payload with headers to the url or saved $URL
+  open_stream [URL]   : makes a get call to SSE endpoints
+
+# RESET
+  reset_rubypost      : wipes the slate clean (including history)
