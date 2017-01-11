@@ -12,6 +12,7 @@ COMMANDS:
   history             : views save request name log
   payload             : views contents of _payload.json
   headers             : views contents of _headers.list
+  inspect [request]   : displays the specified request
 
 # OPERATIONS
   get [url]           : makes a get call with specified headers to the url or saved $URL

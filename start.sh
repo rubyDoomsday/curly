@@ -7,6 +7,7 @@ alias rubypost_help="cat .manpage"
 alias payload="cat _payload.json"
 alias headers="cat _headers.list"
 
+# shows current loaded request
 show_request() {
   echo "\nURL:  $URL"
   echo "HEADERS:"
@@ -14,13 +15,22 @@ show_request() {
   echo "\nPAYLOAD:"
   cat _payload.json
 }
+
+# inspects a saved request
+inspect() {
+  echo "\nURL:" cat urls/$1'.string'
+  echo "HEADERS:"
+  cat headers/$1'.list'
+  echo "\nPAYLOAD:"
+  cat payloads/$1'.json'
+}
 # saves request
 save_request() {
   cp _headers.list headers/$1'.list'
   cp _payload.json payloads/$1'.json'
   cp _response.json responses/$1'.json'
-  echo $URL >> urls/$1'.string'
-  echo $1 >> .history | uniq -u .history >> history.list
+  echo $URL > urls/$1'.string'
+  echo $1 >> .history | uniq -u .history > history.list
   echo "\nSaved Request: $1"
 }
 
