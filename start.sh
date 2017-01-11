@@ -48,6 +48,17 @@ load_request() {
   cat _payload.json
 }
 
+delete_request() {
+  rm headers/$1'.list'
+  rm payloads/$1'.json'
+  rm responses/$1'.json'
+  rm urls/$1'.string'
+  sed "/$1/d" .history > .history.bak && cat .history.bak > .history
+  rm .history.bak
+  rm history.list
+  uniq -u .history > history.list
+  echo "\nDeleted Request: $1"
+}
 # clears current request
 clear_request() {
   rm _headers.list && touch _headers.list
