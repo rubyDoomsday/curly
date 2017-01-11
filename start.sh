@@ -8,7 +8,7 @@ alias payload="cat _payload.json"
 alias headers="cat _headers.list"
 
 show_request() {
-  echo "URL:  $URL"
+  echo "\nURL:  $URL"
   echo "HEADERS:"
   cat _headers.list
   echo "\nPAYLOAD:"
@@ -21,7 +21,7 @@ save_request() {
   cp _response.json responses/$1'.json'
   echo $URL >> urls/$1'.string'
   echo $1 >> .history | uniq -u .history >> history.list
-  echo "saved $1"
+  echo "\nSaved Request: $1"
 }
 
 # load request
@@ -30,7 +30,7 @@ load_request() {
   cp payloads/$1'.json' _payload.json
   cp responses/$1'.json' _response.json
   URL=$(cat urls/$1'.string')
-  echo "LOADED: $1"
+  echo "\nLOADED: $1"
   echo "URL:  $URL"
   echo "HEADERS:"
   cat _headers.list
@@ -44,21 +44,27 @@ clear_request() {
   rm _payload.json && touch _payload.json
   rm _response.json && touch _response.json
   URL=$url_default
-  echo "cleared request params"
-  echo "URL:  $URL"
+  echo "\nCleared Request Params"
+  echo "URL: $URL"
 }
 
 # completely wipes out cache files
 reset_rubypost() {
-  rm _headers.list && touch _headers.list
-  rm _payload.json && touch _payload.json
-  rm _response.json && touch _response.json
-  rm headers/*.*
-  rm payloads/*.*
-  rm responses/*.*
-  URL=$url_default
-  echo "reset RubyPost"
-  echo "URL:  $URL"
+  echo -n "Are you sure you want to clear all history and settings (y/n)?"
+  read answer
+  if echo "$answer" | grep -iq "^y"; then
+    rm _headers.list && touch _headers.list
+    rm _payload.json && touch _payload.json
+    rm _response.json && touch _response.json
+    rm headers/*.*
+    rm payloads/*.*
+    rm responses/*.*
+    URL=$url_default
+    echo "\nReset RubyPost"
+    echo "URL:  $URL"
+  else
+    echo "Canceled"
+  fi
 }
 
 # makes a post call with headers and payload to the supplied url
@@ -102,4 +108,5 @@ open_stream() {
   curl -v "${headers[@]}" -X GET $GET_URL
 }
 
+clear
 cat .manpage
