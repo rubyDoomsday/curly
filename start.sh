@@ -2,27 +2,33 @@ PAYLOAD=@_payload.json
 url_default="http://localhost:3000/"
 URL=$url_default
 
-alias history="cat history.list"
 alias rubypost_help="cat .manpage"
+alias history="cat history.list"
+
 alias payload="cat _payload.json"
+alias set_payload="vim _headers.list"
+
 alias headers="cat _headers.list"
+alias set_headers="vim _headers.list"
 
-# shows current loaded request
+alias inspect_last="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
+
+# inspects current or a saved request
 show_request() {
-  echo "\nURL:  $URL"
-  echo "HEADERS:"
-  cat _headers.list
-  echo "\nPAYLOAD:"
-  cat _payload.json
-}
-
-# inspects a saved request
-inspect() {
-  echo "\nURL:" cat urls/$1'.string'
-  echo "HEADERS:"
-  cat headers/$1'.list'
-  echo "\nPAYLOAD:"
-  cat payloads/$1'.json'
+  if [ -z "$1" ]
+  then
+    echo "\nURL:  $URL"
+    echo "HEADERS:"
+    cat _headers.list
+    echo "\nPAYLOAD:"
+    cat _payload.json
+  else
+    echo "\nURL:" cat urls/$1'.string'
+    echo "HEADERS:"
+    cat headers/$1'.list'
+    echo "\nPAYLOAD:"
+    cat payloads/$1'.json'
+  fi
 }
 # saves request
 save_request() {
