@@ -3,7 +3,7 @@ url_default="http://localhost:3000/"
 URL=$url_default
 
 alias rubypost_help="cat .manpage"
-alias history="cat history.list"
+alias r_history="ls -1 urls | sed -e 's/\.string$//'"
 
 alias payload="cat _payload.json"
 alias set_payload="vim _headers.list"
@@ -36,7 +36,6 @@ save_request() {
   cp _payload.json payloads/$1'.json'
   cp _response.json responses/$1'.json'
   echo $URL > urls/$1'.string'
-  echo $1 >> .history | uniq -u .history > history.list
   echo "\nSaved Request: $1"
 }
 
@@ -59,10 +58,6 @@ delete_request() {
   rm payloads/$1'.json'
   rm responses/$1'.json'
   rm urls/$1'.string'
-  sed "/$1/d" .history > .history.bak && cat .history.bak > .history
-  rm .history.bak
-  rm history.list
-  uniq -u .history > history.list
   echo "\nDeleted Request: $1"
 }
 # clears current request
