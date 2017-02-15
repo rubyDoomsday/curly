@@ -1,10 +1,9 @@
 headers/
 payloads/
 responses/
-urls/
+hosts/
+paths/
 
 _headers.list
 _payload.json
 _response.json
-history.list
-.history
