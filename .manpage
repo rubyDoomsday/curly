@@ -3,11 +3,12 @@ RubyPost V0.1
 
 COMMANDS:
 # HELP
-  rubypost_help       : displays this menu
+  rp_help       : displays this menu
 
 # SETTINGS
-  $URL=[url]          : parametize the url string for easy repeat calls
-  history             : views save request name log
+  set_host [host]     : stores the host for easy repeat calls
+  set_path [path]     : stores a path for easy repeat calls
+  rp_history          : views save request name log
   payload             : quick view contents of payload json
   set_payload         : opens payload json in edit mode
   headers             : quick view contents of headers list
@@ -17,7 +18,7 @@ COMMANDS:
   show_request (request) : displays current request details
   save_request [name]    : saves request
   load_request [name]    : loads specified request
-  inspect_last           : opens last request and response in edit mode
+  rp_inspect             : opens last request and response in edit mode
   clear_request          : clears request param files and URL
 
 # HTTP OPERATIONS

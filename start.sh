@@ -13,7 +13,7 @@ alias set_payload="vim _payload.json"
 alias headers="cat _headers.list"
 alias set_headers="vim _headers.list"
 
-alias inspect_last="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
+alias rp_inspect="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
 
 set_host() {
   RP_HOST=$1
