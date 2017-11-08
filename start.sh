@@ -4,27 +4,26 @@ path_default="/"
 RP_HOST=$host_default
 RP_PATH=$path_default
 
-alias rp_help="cat .manpage"
-alias rp_history="ls -1 hosts | sed -e 's/\.string$//'"
+alias rpHelp="cat .manpage"
 
-alias payload="cat _payload.json"
-alias set_payload="vim _payload.json"
+alias showHistory="ls -1 history"
+alias showPayload="cat _payload.json"
+alias showHeaders="cat _headers.list"
+alias showLast="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
 
-alias headers="cat _headers.list"
-alias set_headers="vim _headers.list"
+alias setPayload="vim _payload.json"
+alias setHeaders="vim _headers.list"
 
-alias rp_inspect="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
-
-set_host() {
+setHost() {
   RP_HOST=$1
 }
 
-set_path() {
+setPath() {
   RP_PATH=$1
 }
 
 # inspects current or a saved request
-show_request() {
+showRequest() {
   if [ -z "$1" ]
   then
     echo "\nHOST: $RP_HOST"
@@ -34,76 +33,87 @@ show_request() {
     echo "\nPAYLOAD:"
     cat _payload.json
   else
-    echo "\nHOST:" cat hosts/$1'.string'
-    echo "PATH:" cat paths/$1'.string'
+    FILENAME="${1#history/}"
+    echo "\nHOST:" cat hosts/$FILENAME'.string'
+    echo "PATH:" cat paths/$FILENAME'.string'
     echo "HEADERS:"
-    cat headers/$1'.list'
+    cat headers/$FILENAME'.list'
     echo "\nPAYLOAD:"
-    cat payloads/$1'.json'
+    cat payloads/$FILENAME'.json'
   fi
 }
 
 # saves request
-save_request() {
-  cp _headers.list headers/$1'.list'
-  cp _payload.json payloads/$1'.json'
-  cp _response.json responses/$1'.json'
-  echo $RP_HOST > hosts/$1'.string'
-  echo $RP_PATH > paths/$1'.string'
-  echo "\nSaved Request: $1"
+saveRequest() {
+  if [ -z "$1" ]
+  then
+    FILENAME="$RP_ACTION${RP_PATH//\//-}-"`date '+%Y-%m-%d-%H-%M'`
+  else
+    FILENAME=$1
+  fi
+  touch history/$FILENAME
+  cp _headers.list headers/$FILENAME'.list'
+  cp _payload.json payloads/$FILENAME'.json'
+  cp _response.json responses/$FILENAME'.json'
+  echo $RP_HOST > hosts/$FILENAME'.string'
+  echo $RP_PATH > paths/$FILENAME'.string'
+  echo "\nSaved Request: $FILENAME"
 }
 
 # load request
-load_request() {
-  cp headers/$1'.list' _headers.list
-  cp payloads/$1'.json' _payload.json
-  cp responses/$1'.json' _response.json
-  RP_HOST=$(cat hosts/$1'.string')
-  RP_PATH=$(cat paths/$1'.string')
-  echo "\nLOADED: $1"
-  echo "HOST:  $RP_HOST"
-  echo "PATH:  $RP_PATH"
-  echo "HEADERS:"
-  cat _headers.list
-  echo "\nPAYLOAD:"
-  cat _payload.json
+loadRequest() {
+  FILENAME="${1#history/}"
+  cp headers/$FILENAME'.list' _headers.list
+  cp payloads/$FILENAME'.json' _payload.json
+  cp responses/$FILENAME'.json' _response.json
+  RP_HOST=$(cat hosts/$FILENAME'.string')
+  RP_PATH=$(cat paths/$FILENAME'.string')
+  echo "\nLOADED: $FILENAME"
+  showRequest
 }
 
-delete_request() {
-  rm headers/$1'.list'
-  rm payloads/$1'.json'
-  rm responses/$1'.json'
-  rm paths/$1'.string'
-  rm hosts/$1'.string'
-  echo "\nDeleted Request: $1"
+deleteRequest() {
+  FILENAME="${1#history/}"
+  rm headers/$FILENAME'.list'
+  rm payloads/$FILENAME'.json'
+  rm responses/$FILENAME'.json'
+  rm paths/$FILENAME'.string'
+  rm hosts/$FILENAME'.string'
+  echo "\nDeleted Request: $FILENAME"
 }
 
 # clears current request
-clear_request() {
-  rm _headers.list && touch _headers.list
+clearRequest() {
+  cp .default_headers.list _headers.list
   rm _payload.json && touch _payload.json
   rm _response.json && touch _response.json
   RP_HOST=$host_default
   RP_PATH=$path_default
   echo "\nCleared Request Params"
-  echo "HOST: $RP_HOST"
+  showRequest
 }
 
 # completely wipes out cache files
-reset_rubypost() {
+rpReset() {
   echo -n "Are you sure you want to clear all history and settings (y/n)?"
   read answer
   if echo "$answer" | grep -iq "^y"; then
-    rm _headers.list && touch _headers.list
+    # clear current containers
+    cp .default_headers.list _headers.list
     rm _payload.json && touch _payload.json
     rm _response.json && touch _response.json
+    # clear history
     rm headers/*.*
+    rm history/*
+    rm hosts/*.*
+    rm paths/*.*
     rm payloads/*.*
     rm responses/*.*
+    # reset defaults
     RP_HOST=$host_default
     RP_PATH=$path_default
     echo "\nReset RubyPost"
-    echo "HOST:  $RP_HOST"
+    showRequest
   else
     echo "Canceled"
   fi
@@ -111,6 +121,7 @@ reset_rubypost() {
 
 # makes a post call with headers and payload to the supplied url
 post() {
+  RP_ACTION="POST"
   headers=""
   while read line ; do
   headers=("${headers[@]}" -H "$line")
@@ -122,10 +133,13 @@ post() {
 
   curl -v -d $PAYLOAD "${headers[@]}" -X POST $POST_URL | json_pp > _response.json &&
     vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
+
+  saveRequest
 }
 
 # makes a get call with headers to the supplied url
 get() {
+  RP_ACTION="GET"
   headers=""
   while read line ; do
   headers=("${headers[@]}" -H "$line")
@@ -137,10 +151,13 @@ get() {
 
   curl -v "${headers[@]}" -X GET $GET_URL | json_pp > _response.json &&
     vim -O _headers.list _response.json
+
+  saveRequest
 }
 
 # makes a get call with headers to the supplied url
-open_stream() {
+openStream() {
+  RP_ACTION="STREAM"
   headers=""
   while read line ; do
   headers=("${headers[@]}" -H "$line")
@@ -151,10 +168,13 @@ open_stream() {
   GET_URL=$RP_HOST$RP_PATH
 
   curl -v "${headers[@]}" -X GET $GET_URL
+
+  saveRequest
 }
 
 # makes a put call with headers and payload to the supplied url
 put() {
+  RP_ACTION="PUT"
   headers=""
   while read line ; do
   headers=("${headers[@]}" -H "$line")
@@ -166,10 +186,13 @@ put() {
 
   curl -v -d $PAYLOAD "${headers[@]}" -X PUT $PUT_URL | json_pp > _response.json &&
     vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
+
+  saveRequest
 }
 
 # makes a put call with headers and payload to the supplied url
 delete() {
+  RP_ACTION="DELETE"
   headers=""
   while read line ; do
   headers=("${headers[@]}" -H "$line")
@@ -181,7 +204,10 @@ delete() {
 
   curl -v "${headers[@]}" -X DELETE $DELETE_URL | json_pp > _response.json &&
     vim -O _headers.list _response.json
+
+  saveRequest
 }
 
+mkdir -p headers history hosts paths payloads responses
 clear
 cat .manpage

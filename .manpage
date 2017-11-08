@@ -1,30 +1,33 @@
-RubyPost V0.1
+RubyPost V0.2
 > An elegant Curl wrapper
 
 COMMANDS:
-# HELP
-  rp_help       : displays this menu
+# RubyPost
+  rpHelp                       : displays this menu
+  rpReset                      : wipes the slate clean (including history)
 
-# SETTINGS
-  set_host [host]     : stores the host for easy repeat calls
-  set_path [path]     : stores a path for easy repeat calls
-  rp_history          : views save request name log
-  payload             : quick view contents of payload json
-  set_payload         : opens payload json in edit mode
-  headers             : quick view contents of headers list
-  set_headers         : opens headers list in edit mode
+# SET
+  setHost [host]               : stores the HTTP host for easy repeat calls
+  setPath [path]               : stores a path for easy repeat calls
+  setPayload                   : opens payload json in edit mode
+  setHeaders                   : opens headers list in edit mode
+
+# SHOW
+  showHistory                  : views save request name log
+  showPayload                  : quick view contents of payload json
+  showHeaders                  : quick view contents of headers list
+  showRequest (request)        : displays full request details
+  showLast                     : opens last request and response in edit mode
 
 # REQUEST HANDLING
-  show_request (request) : displays current request details
-  save_request [name]    : saves request
-  load_request [name]    : loads specified request
-  rp_inspect             : opens last request and response in edit mode
-  clear_request          : clears request param files and URL
+  saveRequest (name)           : saves request with the specified name or timestamp
+  loadRequest history/[name]   : loads specified request from history
+  deleteRequest history/[name] : deletes specified resquest from history
+  clearRequest                 : clears current request
 
 # HTTP OPERATIONS
-  get (url)           : makes a get call with specified headers to the url or saved $URL
-  post (url)          : posts specified payload with headers to the url or saved $URL
-  open_stream (URL)   : makes a get call to SSE endpoints
-
-# RESET
-  reset_rubypost      : wipes the slate clean (including history)
+  get (path)                   : http GET call with specified headers to the host/path or stored host/path
+  post (path)                  : http POST with payload and headers to the host/path or stored host/path
+  put (path)                   : http PUT with payload and headers to the host/path or stored host/path
+  delete (path)                : http DELETE call with headers to the host/path or stored host/path
+  openStream (URL)             : makes a get call to SSE endpoints
