@@ -73,7 +73,8 @@ delete_request() {
   rm headers/$1'.list'
   rm payloads/$1'.json'
   rm responses/$1'.json'
-  rm urls/$1'.string'
+  rm paths/$1'.string'
+  rm hosts/$1'.string'
   echo "\nDeleted Request: $1"
 }
 
@@ -150,6 +151,36 @@ open_stream() {
   GET_URL=$RP_HOST$RP_PATH
 
   curl -v "${headers[@]}" -X GET $GET_URL
+}
+
+# makes a put call with headers and payload to the supplied url
+put() {
+  headers=""
+  while read line ; do
+  headers=("${headers[@]}" -H "$line")
+  done < _headers.list
+
+  PUT_PATH=${1:-$RP_PATH}
+  RP_PATH=$PUT_PATH
+  PUT_URL=$RP_HOST$RP_PATH
+
+  curl -v -d $PAYLOAD "${headers[@]}" -X PUT $PUT_URL | json_pp > _response.json &&
+    vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
+}
+
+# makes a put call with headers and payload to the supplied url
+delete() {
+  headers=""
+  while read line ; do
+  headers=("${headers[@]}" -H "$line")
+  done < _headers.list
+
+  DELETE_PATH=${1:-$RP_PATH}
+  RP_PATH=$DELETE_PATH
+  DELETE_URL=$RP_HOST$RP_PATH
+
+  curl -v "${headers[@]}" -X DELETE $DELETE_URL | json_pp > _response.json &&
+    vim -O _headers.list _response.json
 }
 
 clear
