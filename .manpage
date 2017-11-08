@@ -2,7 +2,7 @@ RubyPost V0.2
 > An elegant Curl wrapper
 
 COMMANDS:
-# RubyPost
+# SYSTEM
   rpHelp                       : displays this menu
   rpReset                      : wipes the slate clean (including history)
 
@@ -30,4 +30,4 @@ COMMANDS:
   post (path)                  : http POST with payload and headers to the host/path or stored host/path
   put (path)                   : http PUT with payload and headers to the host/path or stored host/path
   delete (path)                : http DELETE call with headers to the host/path or stored host/path
-  openStream (URL)             : makes a get call to SSE endpoints
+  openStream (path)            : Opens a long lived http connection to a SSE server path

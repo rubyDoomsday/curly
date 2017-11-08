@@ -30,16 +30,29 @@ showRequest() {
     echo "PATH: $RP_PATH"
     echo "HEADERS:"
     cat _headers.list
-    echo "\nPAYLOAD:"
-    cat _payload.json
+
+    if [ -s _payload.json ]
+    then
+      echo "\nPAYLOAD:"
+      cat _payload.json
+    else
+      echo ""
+    fi
   else
     FILENAME="${1#history/}"
     echo "\nHOST:" cat hosts/$FILENAME'.string'
     echo "PATH:" cat paths/$FILENAME'.string'
+
     echo "HEADERS:"
     cat headers/$FILENAME'.list'
-    echo "\nPAYLOAD:"
-    cat payloads/$FILENAME'.json'
+
+    if [ -s payloads/$FILENAME'.json' ]
+    then
+      echo "\nPAYLOAD:"
+      cat payloads/$FILENAME'.json'
+    else
+      echo ""
+    fi
   fi
 }
 
@@ -74,6 +87,7 @@ loadRequest() {
 
 deleteRequest() {
   FILENAME="${1#history/}"
+  rm history/$FILENAME
   rm headers/$FILENAME'.list'
   rm payloads/$FILENAME'.json'
   rm responses/$FILENAME'.json'
@@ -104,7 +118,7 @@ rpReset() {
     rm _response.json && touch _response.json
     # clear history
     rm headers/*.*
-    rm history/*
+    /bin/rm -f history/*
     rm hosts/*.*
     rm paths/*.*
     rm payloads/*.*
