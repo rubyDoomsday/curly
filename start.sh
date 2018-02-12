@@ -40,8 +40,10 @@ showRequest() {
     fi
   else
     FILENAME="${1#history/}"
-    echo "\nHOST:" cat hosts/$FILENAME'.string'
-    echo "PATH:" cat paths/$FILENAME'.string'
+    echo "\nHOST:"
+    cat hosts/$FILENAME'.string'
+    echo "PATH:"
+    cat paths/$FILENAME'.string'
 
     echo "HEADERS:"
     cat headers/$FILENAME'.list'
@@ -60,7 +62,8 @@ showRequest() {
 saveRequest() {
   if [ -z "$1" ]
   then
-    FILENAME="$RP_ACTION${RP_PATH//\//-}-"`date '+%Y-%m-%d-%H-%M'`
+    host=$(echo $RP_HOST | sed -e 's/http\:\/.*\///g')
+    FILENAME=`date '+%Y-%m-%d_%H%M'`"--$RP_ACTION--$host${RP_PATH//\//.}"
   else
     FILENAME=$1
   fi
