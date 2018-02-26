@@ -166,9 +166,9 @@ post() {
   RP_PATH=$POST_PATH
   POST_URL=$RP_HOST$RP_PATH
 
-  echo "curl -v -d '$(cat _payload.json)'" "${headers[@]}" '-X POST ' $POST_URL
+  echo "\ncurl -v -d '" $(cat _payload.json)"'" $headers '-X POST ' $POST_URL"\n"
 
-  curl -v -d $PAYLOAD "${headers[@]}" -X POST $POST_URL | json_pp > _response.json &&
+  curl -v -d $PAYLOAD $headers -X POST $POST_URL | json_pp > _response.json &&
     vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
 
   saveRequest
@@ -186,9 +186,9 @@ get() {
   RP_PATH=$GET_PATH
   GET_URL=$RP_HOST$RP_PATH
 
-  echo "curl -v " "${headers[@]}" '-X GET' $GET_URL
+  echo "\ncurl -v" $headers '-X GET' $GET_URL"\n"
 
-  curl -v "${headers[@]}" -X GET $GET_URL | json_pp > _response.json &&
+  curl -v $headers -X GET $GET_URL | json_pp > _response.json &&
     vim -O _headers.list _response.json
 
   saveRequest
@@ -206,9 +206,9 @@ openStream() {
   RP_PATH=$GET_PATH
   GET_URL=$RP_HOST$RP_PATH
 
-  echo "curl -v " "${headers[@]}" '-X GET' $GET_URL
+  echo "\ncurl -v" $headers '-X GET' $GET_URL"\n"
 
-  curl -v "${headers[@]}" -X GET $GET_URL
+  curl -v $headers -X GET $GET_URL
 
   saveRequest
 }
@@ -225,9 +225,9 @@ put() {
   RP_PATH=$PUT_PATH
   PUT_URL=$RP_HOST$RP_PATH
 
-  echo "curl -v -d \"$(cat _payload.json)\"" "${headers[@]}" '-X PUT ' $PUT_URL
+  echo "\ncurl -v -d '" $(cat _payload.json)"'" "${headers[@]}" '-X PUT ' $PUT_URL"\n"
 
-  curl -v -d $PAYLOAD "${headers[@]}" -X PUT $PUT_URL | json_pp > _response.json &&
+  curl -v -d $PAYLOAD $headers -X PUT $PUT_URL | json_pp > _response.json &&
     vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
 
   saveRequest
@@ -245,9 +245,9 @@ delete() {
   RP_PATH=$DELETE_PATH
   DELETE_URL=$RP_HOST$RP_PATH
 
-  echo "curl -v" "${headers[@]}" '-X DELETE ' $DELETE_URL
+  echo "\ncurl -v" $headers '-X DELETE ' $DELETE_URL"\n"
 
-  curl -v "${headers[@]}" -X DELETE $DELETE_URL | json_pp > _response.json &&
+  curl -v $headers -X DELETE $DELETE_URL | json_pp > _response.json &&
     vim -O _headers.list _response.json
 
   saveRequest
