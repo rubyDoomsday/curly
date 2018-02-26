@@ -141,7 +141,7 @@ post() {
   RP_ACTION="POST"
   headers=""
   while read line ; do
-  headers=("${headers[@]}" -H "$line")
+    headers=("${headers[@]} -H '$line'")
   done < _headers.list
 
   POST_PATH=${1:-$RP_PATH}
@@ -159,7 +159,7 @@ get() {
   RP_ACTION="GET"
   headers=""
   while read line ; do
-  headers=("${headers[@]}" -H "$line")
+    headers=("${headers[@]} -H '$line'")
   done < _headers.list
 
   GET_PATH=${1:-$RP_PATH}
@@ -177,7 +177,7 @@ openStream() {
   RP_ACTION="STREAM"
   headers=""
   while read line ; do
-  headers=("${headers[@]}" -H "$line")
+    headers=("${headers[@]} -H '$line'")
   done < _headers.list
 
   GET_PATH=${1:-$RP_PATH}
@@ -194,7 +194,7 @@ put() {
   RP_ACTION="PUT"
   headers=""
   while read line ; do
-  headers=("${headers[@]}" -H "$line")
+    headers=("${headers[@]} -H '$line'")
   done < _headers.list
 
   PUT_PATH=${1:-$RP_PATH}
@@ -212,7 +212,7 @@ delete() {
   RP_ACTION="DELETE"
   headers=""
   while read line ; do
-  headers=("${headers[@]}" -H "$line")
+    headers=("${headers[@]} -H '$line'")
   done < _headers.list
 
   DELETE_PATH=${1:-$RP_PATH}
