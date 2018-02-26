@@ -6,7 +6,6 @@ RP_PATH=$path_default
 
 alias rpHelp="cat .manpage"
 
-alias showHistory="ls -1 history"
 alias showPayload="cat _payload.json"
 alias showHeaders="cat _headers.list"
 alias showLast="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
@@ -58,22 +57,41 @@ showRequest() {
   fi
 }
 
+showHistory() {
+  if [ $# -eq 0 ]; then
+    day=""
+  elif [ ${1} = "today" ]; then
+    day=`date '+%Y-%m-%d'`
+  else
+    day=$1
+  fi
+  ls -1 history/$day
+}
+
 # saves request
 saveRequest() {
+  today=`date '+%Y-%m-%d'`
+  mkdir -p history/$today
+  mkdir -p headers/$today
+  mkdir -p payloads/$today
+  mkdir -p paths/$today
+  mkdir -p hosts/$today
+  mkdir -p responses/$today
+
   if [ -z "$1" ]
   then
-    host=$(echo $RP_HOST | sed -e 's/http\:\/.*\///g')
-    FILENAME=`date '+%Y-%m-%d_%H%M'`"--$RP_ACTION--$host${RP_PATH//\//.}"
+    host=$(echo $RP_HOST | sed -e 's/http[s]*\:\/.*\///g')
+    FILENAME="$RP_ACTION--$host--${RP_PATH//\//.}"
   else
     FILENAME=$1
   fi
-  touch history/$FILENAME
-  cp _headers.list headers/$FILENAME'.list'
-  cp _payload.json payloads/$FILENAME'.json'
-  cp _response.json responses/$FILENAME'.json'
-  echo $RP_HOST > hosts/$FILENAME'.string'
-  echo $RP_PATH > paths/$FILENAME'.string'
-  echo "\nSaved Request: $FILENAME"
+  touch history/$today/$FILENAME
+  cp _headers.list headers/$today/$FILENAME'.list'
+  cp _payload.json payloads/$today/$FILENAME'.json'
+  cp _response.json responses/$today/$FILENAME'.json'
+  echo $RP_HOST > hosts/$today/$FILENAME'.string'
+  echo $RP_PATH > paths/$today/$FILENAME'.string'
+  echo "\nSaved Request: $today/$FILENAME"
 }
 
 # load request
@@ -120,12 +138,12 @@ rpReset() {
     rm _payload.json && touch _payload.json
     rm _response.json && touch _response.json
     # clear history
-    rm headers/*.*
-    /bin/rm -f history/*
-    rm hosts/*.*
-    rm paths/*.*
-    rm payloads/*.*
-    rm responses/*.*
+    /bin/rm -f -R headers/*
+    /bin/rm -f -R history/*
+    /bin/rm -R hosts/*
+    /bin/rm -R paths/*
+    /bin/rm -R payloads/*
+    /bin/rm -R responses/*
     # reset defaults
     RP_HOST=$host_default
     RP_PATH=$path_default
@@ -148,6 +166,8 @@ post() {
   RP_PATH=$POST_PATH
   POST_URL=$RP_HOST$RP_PATH
 
+  echo "curl -v -d '$(cat _payload.json)'" "${headers[@]}" '-X POST ' $POST_URL
+
   curl -v -d $PAYLOAD "${headers[@]}" -X POST $POST_URL | json_pp > _response.json &&
     vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
 
@@ -165,6 +185,8 @@ get() {
   GET_PATH=${1:-$RP_PATH}
   RP_PATH=$GET_PATH
   GET_URL=$RP_HOST$RP_PATH
+
+  echo "curl -v " "${headers[@]}" '-X GET' $GET_URL
 
   curl -v "${headers[@]}" -X GET $GET_URL | json_pp > _response.json &&
     vim -O _headers.list _response.json
@@ -184,6 +206,8 @@ openStream() {
   RP_PATH=$GET_PATH
   GET_URL=$RP_HOST$RP_PATH
 
+  echo "curl -v " "${headers[@]}" '-X GET' $GET_URL
+
   curl -v "${headers[@]}" -X GET $GET_URL
 
   saveRequest
@@ -200,6 +224,8 @@ put() {
   PUT_PATH=${1:-$RP_PATH}
   RP_PATH=$PUT_PATH
   PUT_URL=$RP_HOST$RP_PATH
+
+  echo "curl -v -d \"$(cat _payload.json)\"" "${headers[@]}" '-X PUT ' $PUT_URL
 
   curl -v -d $PAYLOAD "${headers[@]}" -X PUT $PUT_URL | json_pp > _response.json &&
     vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
@@ -218,6 +244,8 @@ delete() {
   DELETE_PATH=${1:-$RP_PATH}
   RP_PATH=$DELETE_PATH
   DELETE_URL=$RP_HOST$RP_PATH
+
+  echo "curl -v" "${headers[@]}" '-X DELETE ' $DELETE_URL
 
   curl -v "${headers[@]}" -X DELETE $DELETE_URL | json_pp > _response.json &&
     vim -O _headers.list _response.json
