@@ -117,6 +117,17 @@ deleteRequest() {
   echo "\nDeleted Request: $FILENAME"
 }
 
+eraseDay() {
+  DAY="${1#history/}"
+  rm -r -f history/$DAY
+  rm -r -f headers/$DAY
+  rm -r -f payloads/$DAY
+  rm -r -f responses/$DAY
+  rm -r -f paths/$DAY
+  rm -r -f hosts/$DAY
+  echo "\nErased: $DAY"
+}
+
 # clears current request
 clearRequest() {
   cp .default_headers.list _headers.list
@@ -208,7 +219,7 @@ openStream() {
   RP_PATH=$GET_PATH
   GET_URL=$RP_HOST$RP_PATH
 
-  cmd="curl -v $headers -X GET '$GET_URL'"
+  cmd="curl -v $headers -X GET '$GET_URL' --http1.1"
 
   echo "\n"$cmd"\n"
   eval $cmd
