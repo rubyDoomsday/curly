@@ -239,7 +239,7 @@ put() {
   RP_PATH=$PUT_PATH
   PUT_URL=$RP_HOST$RP_PATH
 
-  cmd="curl -v -d $PAYLOAD $headers -X PUT '$GET_URL'"
+  cmd="curl -v -d $PAYLOAD $headers -X PUT '$PUT_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | json_pp > _response.json &&
