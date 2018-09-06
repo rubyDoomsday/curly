@@ -1,5 +1,5 @@
-RubyPost V0.2
-> An elegant Curl wrapper
+RubyPost V0.3
+> An elegant Curl wrapper for managing requests
 
 COMMANDS:
 # SYSTEM
@@ -20,10 +20,11 @@ COMMANDS:
   showLast                     : opens last request and response in edit mode
 
 # REQUEST HANDLING
-  saveRequest (name)           : saves request with the specified name or timestamp
-  loadRequest history/[name]   : loads specified request from history
-  deleteRequest history/[name] : deletes specified resquest from history
-  clearRequest                 : clears current request
+  saveRequest (name)                  : saves request with the specified name or timestamp
+  loadRequest history/[date]/[name]   : loads specified request from history
+  deleteRequest history/[date]/[name] : deletes specified resquest from history
+  clearRequest                        : clears current request
+  eraseDay history/[date]             : deletes entire day
 
 # HTTP OPERATIONS
   get (path)                   : http GET call with specified headers to the host/path or stored host/path

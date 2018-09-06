@@ -180,7 +180,7 @@ post() {
   cmd="curl -v -d $PAYLOAD $headers -X POST '$POST_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | json_pp > _response.json &&
+  eval $cmd | jq . > _response.json &&
     vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
 
   saveRequest
@@ -201,7 +201,7 @@ get() {
   cmd="curl -v $headers -X GET '$GET_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | json_pp > _response.json &&
+  eval $cmd | jq . > _response.json &&
     vim -O _headers.list _response.json
 
   saveRequest
@@ -242,13 +242,13 @@ put() {
   cmd="curl -v -d $PAYLOAD $headers -X PUT '$PUT_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | json_pp > _response.json &&
+  eval $cmd | jq . > _response.json &&
     vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
 
   saveRequest
 }
 
-# makes a put call with headers and payload to the supplied url
+# makes a delete call with headers and payload to the supplied url
 delete() {
   RP_ACTION="DELETE"
   headers=""
@@ -263,7 +263,7 @@ delete() {
   cmd="curl -v $headers -X DELETE '$DELETE_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | json_pp > _response.json &&
+  eval $cmd | jq . > _response.json &&
     vim -O _headers.list _response.json
 
   saveRequest
