@@ -1,32 +1,30 @@
+# ensure environement on source
+mkdir -p headers history hosts paths payloads responses
+touch _headers.list
+touch _payload.json
+clear
+cat .manpage
+
 PAYLOAD=@_payload.json
 host_default="http://localhost:3000"
 path_default="/"
-RP_HOST=$host_default
-RP_PATH=$path_default
+CURLY_HOST=$host_default
+CURLY_PATH=$path_default
+setHost() { CURLY_HOST=$1 }
+setPath() { CURLY_PATH=$1 }
 
-alias rpHelp="cat .manpage"
-
-alias showPayload="cat _payload.json"
-alias showHeaders="cat _headers.list"
-alias showLast="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
-
+alias curlyHelp="cat .manpage"
 alias setPayload="vim _payload.json"
-alias setHeaders="vim _headers.list"
-
-setHost() {
-  RP_HOST=$1
-}
-
-setPath() {
-  RP_PATH=$1
-}
+alias setHeaders="vim _headers.json"
+alias showLast="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
+alias showLastNoPayload="vim -O _headers.list _response.json"
 
 # inspects current or a saved request
 showRequest() {
   if [ -z "$1" ]
   then
-    echo "\nHOST: $RP_HOST"
-    echo "PATH: $RP_PATH"
+    echo "\nHOST: $CURLY_HOST"
+    echo "PATH: $CURLY_PATH"
     echo "HEADERS:"
     cat _headers.list
 
@@ -57,17 +55,6 @@ showRequest() {
   fi
 }
 
-showHistory() {
-  if [ $# -eq 0 ]; then
-    day=""
-  elif [ ${1} = "today" ]; then
-    day=`date '+%Y-%m-%d'`
-  else
-    day=$1
-  fi
-  ls -1 history/$day
-}
-
 # saves request
 saveRequest() {
   today=`date '+%Y-%m-%d'`
@@ -80,8 +67,8 @@ saveRequest() {
 
   if [ -z "$1" ]
   then
-    host=$(echo $RP_HOST | sed -e 's/http[s]*\:\/.*\///g')
-    FILENAME="$RP_ACTION--$host--${RP_PATH//\//.}"
+    host=$(echo $CURLY_HOST | sed -e 's/http[s]*\:\/.*\///g')
+    FILENAME="$CURLY_ACTION--$host--${CURLY_PATH//\//.}"
   else
     FILENAME=$1
   fi
@@ -89,8 +76,8 @@ saveRequest() {
   cp _headers.list headers/$today/$FILENAME'.list'
   cp _payload.json payloads/$today/$FILENAME'.json'
   cp _response.json responses/$today/$FILENAME'.json'
-  echo $RP_HOST > hosts/$today/$FILENAME'.string'
-  echo $RP_PATH > paths/$today/$FILENAME'.string'
+  echo $CURLY_HOST > hosts/$today/$FILENAME'.string'
+  echo $CURLY_PATH > paths/$today/$FILENAME'.string'
   echo "\nSaved Request: $today/$FILENAME"
 }
 
@@ -100,8 +87,8 @@ loadRequest() {
   cp headers/$FILENAME'.list' _headers.list
   cp payloads/$FILENAME'.json' _payload.json
   cp responses/$FILENAME'.json' _response.json
-  RP_HOST=$(cat hosts/$FILENAME'.string')
-  RP_PATH=$(cat paths/$FILENAME'.string')
+  CURLY_HOST=$(cat hosts/$FILENAME'.string')
+  CURLY_PATH=$(cat paths/$FILENAME'.string')
   echo "\nLOADED: $FILENAME"
   showRequest
 }
@@ -133,14 +120,14 @@ clearRequest() {
   cp .default_headers.list _headers.list
   rm _payload.json && touch _payload.json
   rm _response.json && touch _response.json
-  RP_HOST=$host_default
-  RP_PATH=$path_default
+  CURLY_HOST=$host_default
+  CURLY_PATH=$path_default
   echo "\nCleared Request Params"
   showRequest
 }
 
 # completely wipes out cache files
-rpReset() {
+curlyReset() {
   echo -n "Are you sure you want to clear all history and settings (y/n)?"
   read answer
   if echo "$answer" | grep -iq "^y"; then
@@ -156,8 +143,8 @@ rpReset() {
     /bin/rm -R payloads/*
     /bin/rm -R responses/*
     # reset defaults
-    RP_HOST=$host_default
-    RP_PATH=$path_default
+    CURLY_HOST=$host_default
+    CURLY_PATH=$path_default
     echo "\nReset RubyPost"
     showRequest
   else
@@ -165,59 +152,54 @@ rpReset() {
   fi
 }
 
-# makes a post call with headers and payload to the supplied url
-post() {
-  RP_ACTION="POST"
+loadHeaders() {
   headers=""
   while read line ; do
     headers=("${headers[@]} -H '$line'")
   done < _headers.list
+  echo $headers
+}
 
-  POST_PATH=${1:-$RP_PATH}
-  RP_PATH=$POST_PATH
-  POST_URL=$RP_HOST$RP_PATH
+# makes a post call with headers and payload to the supplied url
+post() {
+  CURLY_ACTION="POST"
+  headers=`loadHeaders`
+
+  post_path=${1:-$CURLY_PATH}
+  CURLY_PATH=$post_path
+  POST_URL=$CURLY_HOST$CURLY_PATH
 
   cmd="curl -d $PAYLOAD $headers -X POST '$POST_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json &&
-    vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
-
+  eval $cmd | jq . > _response.json && showLast
   saveRequest
 }
 
 # makes a get call with headers to the supplied url
 get() {
-  RP_ACTION="GET"
-  headers=""
-  while read line ; do
-    headers=("${headers[@]} -H '$line'")
-  done < _headers.list
+  CURLY_ACTION="GET"
+  headers=`loadHeaders`
 
-  GET_PATH=${1:-$RP_PATH}
-  RP_PATH=$GET_PATH
-  GET_URL=$RP_HOST$RP_PATH
+  get_path=${1:-$CURLY_PATH}
+  CURLY_PATH=$get_path
+  GET_URL=$CURLY_HOST$CURLY_PATH
 
   cmd="curl $headers -X GET '$GET_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json &&
-    vim -O _headers.list _response.json
-
+  eval $cmd | jq . > _response.json && showLastNoPayload
   saveRequest
 }
 
 # makes a get call with headers to the supplied url
 openStream() {
-  RP_ACTION="STREAM"
-  headers=""
-  while read line ; do
-    headers=("${headers[@]} -H '$line'")
-  done < _headers.list
+  CURLY_ACTION="STREAM"
+  headers=`loadHeaders`
 
-  GET_PATH=${1:-$RP_PATH}
-  RP_PATH=$GET_PATH
-  GET_URL=$RP_HOST$RP_PATH
+  get_path=${1:-$CURLY_PATH}
+  CURLY_PATH=$get_path
+  GET_URL=$CURLY_HOST$CURLY_PATH
 
   cmd="curl $headers -X GET '$GET_URL' --http1.1"
 
@@ -229,46 +211,32 @@ openStream() {
 
 # makes a put call with headers and payload to the supplied url
 put() {
-  RP_ACTION="PUT"
-  headers=""
-  while read line ; do
-    headers=("${headers[@]} -H '$line'")
-  done < _headers.list
+  CURLY_ACTION="PUT"
+  headers=`loadHeaders`
 
-  PUT_PATH=${1:-$RP_PATH}
-  RP_PATH=$PUT_PATH
-  PUT_URL=$RP_HOST$RP_PATH
+  put_path=${1:-$CURLY_PATH}
+  CURLY_PATH=$put_path
+  PUT_URL=$CURLY_HOST$CURLY_PATH
 
   cmd="curl -d $PAYLOAD $headers -X PUT '$PUT_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json &&
-    vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'
-
+  eval $cmd | jq . > _response.json && showLast
   saveRequest
 }
 
 # makes a delete call with headers and payload to the supplied url
 delete() {
-  RP_ACTION="DELETE"
-  headers=""
-  while read line ; do
-    headers=("${headers[@]} -H '$line'")
-  done < _headers.list
+  CURLY_ACTION="DELETE"
+  headers=`loadHeaders`
 
-  DELETE_PATH=${1:-$RP_PATH}
-  RP_PATH=$DELETE_PATH
-  DELETE_URL=$RP_HOST$RP_PATH
+  delete_path=${1:-$CURLY_PATH}
+  CURLY_PATH=$delete_path
+  DELETE_URL=$CURLY_HOST$CURLY_PATH
 
   cmd="curl $headers -X DELETE '$DELETE_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json &&
-    vim -O _headers.list _response.json
-
+  eval $cmd | jq . > _response.json && showLastNoPayload
   saveRequest
 }
-
-mkdir -p headers history hosts paths payloads responses
-clear
-cat .manpage

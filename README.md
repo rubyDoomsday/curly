@@ -1,4 +1,4 @@
-# RubyPost v0.1
+# Curly v0.1
 Designed to be a intuitive stateful wrapper for building, saving and recalling curl requests by providing a series of "helper" commands (not quite full shell commands). This allows for `payload`, `headers` and `response` inspection along with easy request editing via terminal commands and vim editor. Supports GET, POST, PUT and DELETE requests in addition to establishing a long lived SSE connection to a server.
 
 ## Requirements
@@ -18,10 +18,10 @@ or
 ```
 
 ### To Install RubyPost
-The scripts are meant to be installed to and used from the local `rubypost` repo directory. It is recommended to run this in it's own terminal rather than installing it into `/user/bin` to limit interference with standard bash commands. On first load the helper commands will be displayed to get you started and can be recalled at any time with the `rpHelp` helper.
+The scripts are meant to be installed to and used from the local repo directory. It is recommended to run this in it's own terminal rather than installing it into `/user/bin` to limit interference with standard bash commands. On first load the helper commands will be displayed to get you started and can be recalled at any time with the `rpHelp` helper.
 ```
-> git clone git@github.com:rubyDoomsday/rubypost.git rubypost
-> cd rubypost
+> git clone git@github.com:rubyDoomsday/curly.git curly
+> cd curly
 > chmod 777 start.sh
 > source ./start.sh
 ```

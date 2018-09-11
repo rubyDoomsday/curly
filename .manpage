@@ -1,10 +1,10 @@
-RubyPost V0.3
+Curly V0.3
 > An elegant Curl wrapper for managing requests
 
 COMMANDS:
 # SYSTEM
-  rpHelp                       : displays this menu
-  rpReset                      : wipes the slate clean (including history)
+  curlyHelp                       : displays this menu
+  curlyReset                      : wipes the slate clean (including history)
 
 # SET
   setHost [host]               : stores the HTTP host for easy repeat calls
@@ -13,9 +13,6 @@ COMMANDS:
   setHeaders                   : opens headers list in edit mode
 
 # SHOW
-  showHistory                  : views save request name log
-  showPayload                  : quick view contents of payload json
-  showHeaders                  : quick view contents of headers list
   showRequest (request)        : displays full request details
   showLast                     : opens last request and response in edit mode
 
