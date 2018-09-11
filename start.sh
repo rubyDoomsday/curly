@@ -177,7 +177,7 @@ post() {
   RP_PATH=$POST_PATH
   POST_URL=$RP_HOST$RP_PATH
 
-  cmd="curl -v -d $PAYLOAD $headers -X POST '$POST_URL'"
+  cmd="curl -d $PAYLOAD $headers -X POST '$POST_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | jq . > _response.json &&
@@ -198,7 +198,7 @@ get() {
   RP_PATH=$GET_PATH
   GET_URL=$RP_HOST$RP_PATH
 
-  cmd="curl -v $headers -X GET '$GET_URL'"
+  cmd="curl $headers -X GET '$GET_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | jq . > _response.json &&
@@ -219,7 +219,7 @@ openStream() {
   RP_PATH=$GET_PATH
   GET_URL=$RP_HOST$RP_PATH
 
-  cmd="curl -v $headers -X GET '$GET_URL' --http1.1"
+  cmd="curl $headers -X GET '$GET_URL' --http1.1"
 
   echo "\n"$cmd"\n"
   eval $cmd
@@ -239,7 +239,7 @@ put() {
   RP_PATH=$PUT_PATH
   PUT_URL=$RP_HOST$RP_PATH
 
-  cmd="curl -v -d $PAYLOAD $headers -X PUT '$PUT_URL'"
+  cmd="curl -d $PAYLOAD $headers -X PUT '$PUT_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | jq . > _response.json &&
@@ -260,7 +260,7 @@ delete() {
   RP_PATH=$DELETE_PATH
   DELETE_URL=$RP_HOST$RP_PATH
 
-  cmd="curl -v $headers -X DELETE '$DELETE_URL'"
+  cmd="curl $headers -X DELETE '$DELETE_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | jq . > _response.json &&
