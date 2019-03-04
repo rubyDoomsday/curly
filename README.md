@@ -17,7 +17,7 @@ or
 > brew install json_pp
 ```
 
-### To Install RubyPost
+### To Install Curly
 The scripts are meant to be installed to and used from the local repo directory. It is recommended to run this in it's own terminal rather than installing it into `/user/bin` to limit interference with standard bash commands. On first load the helper commands will be displayed to get you started and can be recalled at any time with the `rpHelp` helper.
 ```
 > git clone git@github.com:rubyDoomsday/curly.git curly
