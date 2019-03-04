@@ -15,7 +15,7 @@ setPath() { CURLY_PATH=$1 }
 
 alias curlyHelp="cat .manpage"
 alias setPayload="vim _payload.json"
-alias setHeaders="vim _headers.json"
+alias setHeaders="vim _headers.list"
 alias showLast="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
 alias showLastNoPayload="vim -O _headers.list _response.json"
 
@@ -219,6 +219,22 @@ put() {
   PUT_URL=$CURLY_HOST$CURLY_PATH
 
   cmd="curl -d $PAYLOAD $headers -X PUT '$PUT_URL'"
+
+  echo "\n"$cmd"\n"
+  eval $cmd | jq . > _response.json && showLast
+  saveRequest
+}
+
+# makes a put call with headers and payload to the supplied url
+patch() {
+  CURLY_ACTION="PUT"
+  headers=`loadHeaders`
+
+  patch_path=${1:-$CURLY_PATH}
+  CURLY_PATH=$patch_path
+  PATCH_URL=$CURLY_HOST$CURLY_PATH
+
+  cmd="curl -d $PAYLOAD $headers -X PATCH '$PATCH_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | jq . > _response.json && showLast
