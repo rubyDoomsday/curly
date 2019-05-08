@@ -1,4 +1,7 @@
+CURLY_HOME=$HOME/_my_projects/curly
+
 # ensure environement on source
+cd CURLY_HOME
 mkdir -p headers history hosts paths payloads responses
 touch _headers.list
 touch _payload.json
