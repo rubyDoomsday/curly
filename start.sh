@@ -1,26 +1,36 @@
 CURLY_HOME=$HOME/_my_projects/curly
+JSON=$CURLY_HOME/_payload.json # usede for standard json data
+DATA=$CURLY_HOME/_payload # used for url-encoded data
+HEADERS=$CURLY_HOME/_headers.list
+RESPONSE=$CURLY_HOME/_response.json
 
 # ensure environement on source
 cd CURLY_HOME
 mkdir -p headers history hosts paths payloads responses
-touch _headers.list
-touch _payload.json
+touch $HEADERS
+touch $JSON
 clear
 cat .manpage
 
-PAYLOAD=@_payload.json
 host_default="http://localhost:3000"
 path_default="/"
+
 CURLY_HOST=$host_default
 CURLY_PATH=$path_default
-setHost() { CURLY_HOST=$1 }
-setPath() { CURLY_PATH=$1 }
+
+setHost() {
+  CURLY_HOST=$1
+}
+
+setPath() {
+  CURLY_PATH=$1
+}
 
 alias curlyHelp="cat .manpage"
-alias setPayload="vim _payload.json"
-alias setHeaders="vim _headers.list"
-alias showLast="vim _response.json -c 'vsplit _payload.json' -c 'split _headers.list'"
-alias showLastNoPayload="vim -O _headers.list _response.json"
+alias setPayload="vim $JSON"
+alias setHeaders="vim $HEADERS"
+alias showLast="vim $RESPONSE -c 'vsplit $JSON' -c 'split $HEADERS'"
+alias showLastNoPayload="vim -O $HEADERS $RESPONSE"
 
 # inspects current or a saved request
 showRequest() {
@@ -29,12 +39,12 @@ showRequest() {
     echo "\nHOST: $CURLY_HOST"
     echo "PATH: $CURLY_PATH"
     echo "HEADERS:"
-    cat _headers.list
+    cat $HEADERS
 
-    if [ -s _payload.json ]
+    if [ -s $JSON ]
     then
       echo "\nPAYLOAD:"
-      cat _payload.json
+      cat $JSON
     else
       echo ""
     fi
@@ -76,9 +86,9 @@ saveRequest() {
     FILENAME=$1
   fi
   touch history/$today/$FILENAME
-  cp _headers.list headers/$today/$FILENAME'.list'
-  cp _payload.json payloads/$today/$FILENAME'.json'
-  cp _response.json responses/$today/$FILENAME'.json'
+  cp $HEADERS headers/$today/$FILENAME'.list'
+  cp $JSON payloads/$today/$FILENAME'.json'
+  cp $RESPONSE responses/$today/$FILENAME'.json'
   echo $CURLY_HOST > hosts/$today/$FILENAME'.string'
   echo $CURLY_PATH > paths/$today/$FILENAME'.string'
   echo "\nSaved Request: $today/$FILENAME"
@@ -87,9 +97,9 @@ saveRequest() {
 # load request
 loadRequest() {
   FILENAME="${1#history/}"
-  cp headers/$FILENAME'.list' _headers.list
-  cp payloads/$FILENAME'.json' _payload.json
-  cp responses/$FILENAME'.json' _response.json
+  cp headers/$FILENAME'.list' $HEADERS
+  cp payloads/$FILENAME'.json' $JSON
+  cp responses/$FILENAME'.json' $RESPONSE
   CURLY_HOST=$(cat hosts/$FILENAME'.string')
   CURLY_PATH=$(cat paths/$FILENAME'.string')
   echo "\nLOADED: $FILENAME"
@@ -120,9 +130,9 @@ eraseDay() {
 
 # clears current request
 clearRequest() {
-  cp .default_headers.list _headers.list
-  rm _payload.json && touch _payload.json
-  rm _response.json && touch _response.json
+  cp .default_headers.list $HEADERS
+  rm $JSON && touch $JSON
+  rm $RESPONSE && touch $RESPONSE
   CURLY_HOST=$host_default
   CURLY_PATH=$path_default
   echo "\nCleared Request Params"
@@ -135,9 +145,9 @@ curlyReset() {
   read answer
   if echo "$answer" | grep -iq "^y"; then
     # clear current containers
-    cp .default_headers.list _headers.list
-    rm _payload.json && touch _payload.json
-    rm _response.json && touch _response.json
+    cp .default_headers.list $HEADERS
+    rm $JSON && touch $JSON
+    rm $RESPONSE && touch $RESPONSE
     # clear history
     /bin/rm -f -R headers/*
     /bin/rm -f -R history/*
@@ -159,8 +169,16 @@ loadHeaders() {
   headers=""
   while read line ; do
     headers=("${headers[@]} -H '$line'")
-  done < _headers.list
+  done < $HEADERS
   echo $headers
+}
+
+loadFormData() {
+  data=""
+  while read line ; do
+    data=("${data[@]} --data-urlencode '$line'")
+  done < $DATA
+  echo $data
 }
 
 # makes a post call with headers and payload to the supplied url
@@ -172,10 +190,10 @@ post() {
   CURLY_PATH=$post_path
   POST_URL=$CURLY_HOST$CURLY_PATH
 
-  cmd="curl -d $PAYLOAD $headers -X POST '$POST_URL'"
+  cmd="curl -d '@$JSON' $headers -X POST '$POST_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json && showLast
+  eval $cmd | jq . > $RESPONSE && showLast
   saveRequest
 }
 
@@ -191,7 +209,7 @@ get() {
   cmd="curl $headers -X GET '$GET_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json && showLastNoPayload
+  eval $cmd | jq . > $RESPONSE && showLastNoPayload
   saveRequest
 }
 
@@ -221,10 +239,10 @@ put() {
   CURLY_PATH=$put_path
   PUT_URL=$CURLY_HOST$CURLY_PATH
 
-  cmd="curl -d $PAYLOAD $headers -X PUT '$PUT_URL'"
+  cmd="curl -d '@$JSON' $headers -X PUT '$PUT_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json && showLast
+  eval $cmd | jq . > $RESPONSE && showLast
   saveRequest
 }
 
@@ -237,10 +255,10 @@ patch() {
   CURLY_PATH=$patch_path
   PATCH_URL=$CURLY_HOST$CURLY_PATH
 
-  cmd="curl -d $PAYLOAD $headers -X PATCH '$PATCH_URL'"
+  cmd="curl -d '@$JSON' $headers -X PATCH '$PATCH_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json && showLast
+  eval $cmd | jq . > $RESPONSE && showLast
   saveRequest
 }
 
@@ -256,6 +274,27 @@ delete() {
   cmd="curl $headers -X DELETE '$DELETE_URL'"
 
   echo "\n"$cmd"\n"
-  eval $cmd | jq . > _response.json && showLastNoPayload
+  eval $cmd | jq . > $RESPONSE && showLastNoPayload
   saveRequest
+}
+
+postForm() {
+  CURLY_ACTION="POST"
+  headers=`loadHeaders`
+
+  # convert json to url-encoded format
+  cat $JSON | sed 's/[{}\" ,]//g;s/\:/=/g;/^[[:space:]]*$/d' > $DATA
+  data=`loadFormData`
+
+  post_path=${1:-$CURLY_PATH}
+  CURLY_PATH=$post_path
+  POST_URL=$CURLY_HOST$CURLY_PATH
+
+  cmd="curl $data $headers -X POST '$POST_URL'"
+
+  echo "\n"$cmd"\n"
+  eval $cmd | jq . > $RESPONSE && showLast
+  saveRequest
+
+  rm $DATA # remove temp file
 }
