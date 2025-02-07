@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Check if the JSON file is provided
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 input.json output.csv"
+  exit 1
+fi
+
+input_file="$1"
+output_file="$2"
+
+# Write the header to the CSV file
+echo "id,service,schema,created_at,paused,sync_frequency,networking_method,setup_state,group_id" > "$output_file"
+
+# Use jq to process the JSON and convert it to CSV
+jq -r '
+  .data.items[] |
+  [
+    .id,
+    .service,
+    .schema,
+    .created_at,
+    .paused,
+    .sync_frequency,
+    .networking_method,
+    .status.setup_state,
+    .group_id
+  ] | @csv
+' "$input_file" >> "$output_file"
+
+echo "CSV file created successfully at $output_file"
