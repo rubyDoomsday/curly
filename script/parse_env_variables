@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# This script will parse the list ENV variables JSON responce from the DBT Cloud API
+# path:
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null
+then
+    echo "jq is required but not installed. Please install jq and try again."
+    exit 1
+fi
+
+# Check if a file is passed as an argument
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <json_file>"
+    exit 1
+fi
+
+json_file=$1
+output_file="$2"
+
+# Check if the file exists
+if [ ! -f "$json_file" ]; then
+    echo "File $json_file not found!"
+    exit 1
+fi
+
+# Parse and print the JSON data
+echo "{\n\"env_var\": [" > "$output_file"
+
+jq -r '
+    .data.variables | to_entries[] |
+    "{\n" +
+    "  \"name\": \"\(.key)\",\n" +
+    "  \"new_name\": \"\(.key)\",\n" +
+    "  \"project\": \"\"\n" +
+    "},\n"
+' "$json_file" >> "$output_file"
+
+echo ']' >> "$output_file"

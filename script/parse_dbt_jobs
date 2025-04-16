@@ -1,4 +1,6 @@
 #!/bin/bash
+# This scrip will parse the list jobs JSON responce from the DBT Cloud API
+# path /api/v2/accounts/[id]/jobs/
 
 # Check if the JSON file is provided
 if [ "$#" -ne 2 ]; then

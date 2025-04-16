@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This script will parse the list connectors JSON response from the Fivetran Api
+# path:
+
 # Check if the JSON file is provided
 if [ "$#" -ne 2 ]; then
   echo "Usage: $0 input.json output.csv"
