@@ -18,19 +18,20 @@ echo "id,service,schema,created_at,paused,sync_frequency,networking_method,setup
 # Use jq to process the JSON and convert it to CSV
 jq -r '
   .data.items[] |
+  . as $item |
   [
-    .id,
-    .service,
-    .schema,
-    .created_at,
-    .paused,
-    .sync_frequency,
-    .networking_method,
-    .status.setup_state,
-    .group_id
+    $item.id,
+    $item.service,
+    $item.schema,
+    $item.created_at,
+    $item.paused,
+    $item.sync_frequency,
+    $item.networking_method,
+    $item.status.setup_state,
+    $item.group_id,
     (
-      if $item.group_id == "making_adviser" then "ProdSnowflake"
-      elif $item.group_id == "wad_sod" then "DevSnowflake"
+      if $item.group_id == "making_adviser" then "SnowflakeProd"
+      elif $item.group_id == "wad_sod" then "SnowflakeDev"
       else "" end
     )
   ] | @csv
