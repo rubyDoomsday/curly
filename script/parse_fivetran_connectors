@@ -13,7 +13,7 @@ input_file="$1"
 output_file="$2"
 
 # Write the header to the CSV file
-echo "id,service,schema,created_at,paused,sync_frequency,networking_method,setup_state,group_id" > "$output_file"
+echo "id,service,schema,created_at,paused,sync_frequency,networking_method,setup_state,group_id,destination" > "$output_file"
 
 # Use jq to process the JSON and convert it to CSV
 jq -r '
@@ -28,6 +28,11 @@ jq -r '
     .networking_method,
     .status.setup_state,
     .group_id
+    (
+      if $item.group_id == "making_adviser" then "ProdSnowflake"
+      elif $item.group_id == "wad_sod" then "DevSnowflake"
+      else "" end
+    )
   ] | @csv
 ' "$input_file" >> "$output_file"
 
