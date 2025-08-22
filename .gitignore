@@ -9,3 +9,5 @@ _headers.list
 _payload.json
 _response.json
 *.csv
+
+config.json
