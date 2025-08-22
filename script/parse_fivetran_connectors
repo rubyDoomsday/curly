@@ -1,22 +1,206 @@
 #!/bin/bash
+# This script will parse the list connectors JSON response from the Fivetran API
+# path: /v1/connectors
 
-# This script will parse the list connectors JSON response from the Fivetran Api
-# path:
+# Default configuration file path
+CONFIG_FILE="fivetran_config.json"
 
-# Check if the JSON file is provided
-if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 input.json output.csv"
+# Function to load configuration from JSON file
+load_config() {
+  local config_file="$1"
+  if [ -f "$config_file" ]; then
+    echo "Loading configuration from: $config_file"
+    # Use jq to extract values and export them as environment variables
+    export AUTH_TOKEN=$(jq -r '.auth_token // empty' "$config_file" 2>/dev/null)
+    export OUTPUT_FILE=$(jq -r '.output_file // empty' "$config_file" 2>/dev/null)
+    
+    # Check if required values were loaded
+    if [ -z "$AUTH_TOKEN" ]; then
+      echo "ERROR: Required value 'auth_token' not found in config file"
+      exit 1
+    fi
+    
+    echo "Configuration loaded successfully"
+    return 0
+  else
+    return 1
+  fi
+}
+
+# Function to display usage information
+show_usage() {
+  echo "Usage: $0 [OPTIONS]"
+  echo ""
+  echo "IMPORTANT: Use either a configuration file OR CLI arguments, not both."
+  echo ""
+  echo "Options:"
+  echo "  -c, --config FILE    Use configuration file (default: $CONFIG_FILE)"
+  echo "  -t, --token TOKEN    Fivetran Basic Auth token"
+  echo "  -o, --output FILE    Output CSV file"
+  echo "  -h, --help           Show this help message"
+  echo ""
+  echo "Examples:"
+  echo "  $0 -c fivetran_config.json                    # Use config file"
+  echo "  $0 -t 'your_auth_token'                       # Use CLI arguments"
+  echo "  $0 -t 'your_auth_token' -o custom.csv"
+  echo ""
+  echo "Configuration file format (JSON):"
+  echo "  {"
+  echo "    \"auth_token\": \"your_auth_token_here\","
+  echo "    \"output_file\": \"custom_output.csv\""
+  echo "  }"
+}
+
+# Parse command line arguments
+AUTH_TOKEN=""
+OUTPUT_FILE=""
+USE_CONFIG=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -c|--config)
+      CONFIG_FILE="$2"
+      USE_CONFIG=true
+      shift 2
+      ;;
+    -t|--token)
+      AUTH_TOKEN="$2"
+      shift 2
+      ;;
+    -o|--output)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      show_usage
+      exit 1
+      ;;
+  esac
+done
+
+# Load configuration from file if requested
+if [ "$USE_CONFIG" = true ]; then
+  if load_config "$CONFIG_FILE"; then
+    echo "Using configuration from: $CONFIG_FILE"
+  else
+    echo "ERROR: Configuration file not found: $CONFIG_FILE"
+    echo "Please create a valid configuration file or use CLI arguments instead."
+    show_usage
+    exit 1
+  fi
+# Check if CLI arguments were provided
+elif [ -n "$AUTH_TOKEN" ]; then
+  echo "Using CLI arguments for configuration"
+  # Validate that required CLI argument is provided
+  if [ -z "$AUTH_TOKEN" ]; then
+    echo "ERROR: auth_token (-t) is required when using CLI arguments"
+    show_usage
+    exit 1
+  fi
+# No configuration method specified
+else
+  echo "ERROR: No configuration method specified"
+  echo "Please either:"
+  echo "  1. Use a configuration file: $0 -c fivetran_config.json"
+  echo "  2. Provide CLI arguments: $0 -k <api_key> -s <api_secret>"
+  show_usage
   exit 1
 fi
 
-input_file="$1"
-output_file="$2"
+# Validate required parameters
+if [ -z "$AUTH_TOKEN" ]; then
+  echo "ERROR: auth_token is required"
+  show_usage
+  exit 1
+fi
+
+# Set variables for use in the script
+auth_token="$AUTH_TOKEN"
+output_file="$OUTPUT_FILE"
+
+# Set default output filename if not provided
+if [ -z "$output_file" ]; then
+  timestamp=$(date +"%Y%m%d_%H%M%S")
+  output_file="fivetran_connectors_audit/fivetran_connectors_${timestamp}.csv"
+else
+  # Ensure output file is in the fivetran_connectors_audit directory
+  if [[ "$output_file" != fivetran_connectors_audit/* ]]; then
+    output_file="fivetran_connectors_audit/$output_file"
+  fi
+fi
+
+# Create execution directory if it doesn't exist
+mkdir -p fivetran_connectors_audit
+
+# Generate timestamp for this run
+run_timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+timestamp=$(date +"%Y%m%d_%H%M%S")
+curl_log_file="fivetran_connectors_audit/curl_request_${timestamp}.sh"
+
+# Cleanup function to remove temporary files
+cleanup() {
+  local exit_code=$?
+  if [ -f "$temp_json" ]; then
+    rm -f "$temp_json"
+    echo "[$run_timestamp] Cleaned up temporary JSON file: $temp_json"
+  fi
+  exit $exit_code
+}
+
+# Set trap to ensure cleanup runs on script exit (success or failure)
+trap cleanup EXIT
+
+# Log the start of processing
+echo "[$run_timestamp] Starting Fivetran connectors processing"
+
+# Always fetch data from API
+echo "[$run_timestamp] Fetching data from Fivetran API..."
+
+# Create temporary JSON file
+temp_json="temp_fivetran_connectors_${timestamp}.json"
+
+# Store the curl command for future use
+cat > "$curl_log_file" << EOF
+#!/bin/bash
+# Fivetran API request for connectors
+# Generated on: $run_timestamp
+# Usage: bash $curl_log_file
+
+curl -H 'Accept: application/json' \\
+     -H 'Authorization: Basic $auth_token' \\
+     -X GET 'https://api.fivetran.com/v1/connectors?limit=1000' \\
+     | jq '.'
+EOF
+
+chmod +x "$curl_log_file"
+echo "[$run_timestamp] Stored curl command in: $curl_log_file"
+
+# Execute the curl request
+echo "[$run_timestamp] Executing API request..."
+if curl -H 'Accept: application/json' \
+        -H "Authorization: Basic $auth_token" \
+        -X GET "https://api.fivetran.com/v1/connectors?limit=1000" \
+        -o "$temp_json" \
+        -s -w "HTTP Status: %{http_code}\nTotal Time: %{time_total}s\n"; then
+  
+  echo "[$run_timestamp] API request successful. Data saved to: $temp_json"
+  input_file="$temp_json"
+else
+  echo "[$run_timestamp] ERROR: Failed to fetch data from API"
+  exit 1
+fi
 
 # Write the header to the CSV file
 echo "id,service,schema,created_at,paused,sync_frequency,networking_method,setup_state,group_id,destination" > "$output_file"
 
 # Use jq to process the JSON and convert it to CSV
-jq -r '
+echo "[$run_timestamp] Processing JSON data with jq..."
+if jq -r '
   .data.items[] |
   . as $item |
   [
@@ -35,6 +219,20 @@ jq -r '
       else "" end
     )
   ] | @csv
-' "$input_file" >> "$output_file"
-
-echo "CSV file created successfully at $output_file"
+' "$input_file" >> "$output_file"; then
+  
+  echo "[$run_timestamp] CSV file created successfully at $output_file"
+  
+  # Count the number of connectors processed
+  connector_count=$(jq '.data.items | length' "$input_file")
+  echo "[$run_timestamp] Processed $connector_count connectors"
+  
+  echo "[$run_timestamp] Processing completed successfully!"
+  echo "Output files:"
+  echo "  CSV: $output_file"
+  echo "  Curl command: $curl_log_file"
+  
+else
+  echo "[$run_timestamp] ERROR: Failed to process JSON data with jq"
+  exit 1
+fi
