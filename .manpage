@@ -1,4 +1,4 @@
-Curly V0.3
+Curly V0.2
 > An elegant Curl wrapper for managing requests
 
 COMMANDS:
@@ -6,26 +6,40 @@ COMMANDS:
   curlyHelp                       : displays this menu
   curlyReset                      : wipes the slate clean (including history)
 
-# SET
-  setHost [host]               : stores the HTTP host for easy repeat calls
-  setPath [path]               : stores a path for easy repeat calls
-  setPayload                   : opens payload json in edit mode
-  setHeaders                   : opens headers list in edit mode
+# CONFIGURATION
+  setRequest                     : opens JSON configuration file for editing
+  reload                         : reloads configuration after manual edits
 
 # SHOW
-  showRequest (request)        : displays full request details
-  showLast                     : opens last request and response in edit mode
+  showRequest                    : displays current request configuration
+  showLast                       : opens last request and response in edit mode
 
 # REQUEST HANDLING
   saveRequest (name)                  : saves request with the specified name or timestamp
   loadRequest history/[date]/[name]   : loads specified request from history
-  deleteRequest history/[date]/[name] : deletes specified resquest from history
-  clearRequest                        : clears current request
+  deleteRequest history/[date]/[name] : deletes specified request from history
+  clearRequest                        : clears current request to defaults
   eraseDay history/[date]             : deletes entire day
 
 # HTTP OPERATIONS
-  get (path)                   : http GET call with specified headers to the host/path or stored host/path
-  post (path)                  : http POST with payload and headers to the host/path or stored host/path
-  put (path)                   : http PUT with payload and headers to the host/path or stored host/path
-  delete (path)                : http DELETE call with headers to the host/path or stored host/path
-  openStream (path)            : Opens a long lived http connection to a SSE server path
+  get (path)                   : http GET call with configured host/path/headers
+  post (path)                  : http POST with configured payload and headers
+  put (path)                   : http PUT with configured payload and headers
+  patch (path)                 : http PATCH with configured payload and headers
+  delete (path)                : http DELETE call with configured headers
+  postForm (path)              : http POST with form-encoded data from payload
+  openStream (path)            : opens long-lived HTTP connection to SSE server path
+
+# CONFIGURATION FORMAT
+  The configuration file (_request_config.json) uses this schema:
+  {
+    "host": "http://localhost:3000",
+    "path": "/",
+    "payload": {},
+    "headers": []
+  }
+
+  - host: Base URL for API requests
+  - path: API endpoint path
+  - payload: JSON object for request body
+  - headers: Array of HTTP headers

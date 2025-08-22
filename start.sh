@@ -1,115 +1,188 @@
 CURLY_HOME=$HOME/_my_projects/curly
-JSON=$CURLY_HOME/_payload.json # usede for standard json data
-DATA=$CURLY_HOME/_payload # used for url-encoded data
-HEADERS=$CURLY_HOME/_headers.list
+REQUEST_CONFIG=$CURLY_HOME/_request_config.json
 RESPONSE=$CURLY_HOME/_response.json
 
-# ensure environement on source
-cd CURLY_HOME
-mkdir -p headers history hosts paths payloads responses
-touch $HEADERS
-touch $JSON
+# ensure environment on source
+cd $CURLY_HOME
+mkdir -p history/requests history/responses
+touch $REQUEST_CONFIG
+touch $RESPONSE
+
+# Initialize default request config if it doesn't exist
+if [ ! -s $REQUEST_CONFIG ]; then
+  cat > $REQUEST_CONFIG << EOF
+{
+  "host": "http://localhost:3000",
+  "path": "/",
+  "payload": {},
+  "headers": []
+}
+EOF
+fi
+
 clear
 cat .manpage
 
-host_default="http://localhost:3000"
-path_default="/"
-
-CURLY_HOST=$host_default
-CURLY_PATH=$path_default
-
-setHost() {
-  CURLY_HOST=$1
+# Load current request config
+loadRequestConfig() {
+  CURLY_HOST=$(jq -r '.host' $REQUEST_CONFIG 2>/dev/null || echo "http://localhost:3000")
+  CURLY_PATH=$(jq -r '.path' $REQUEST_CONFIG 2>/dev/null || echo "/")
+  CURLY_PAYLOAD=$(jq -c '.payload' $REQUEST_CONFIG 2>/dev/null || echo "{}")
+  CURLY_HEADERS=$(jq -r '.headers[]?' $REQUEST_CONFIG 2>/dev/null || echo "")
 }
 
-setPath() {
-  CURLY_PATH=$1
-}
+# Load initial config
+loadRequestConfig
 
 alias curlyHelp="cat .manpage"
-alias setPayload="vim $JSON"
-alias setHeaders="vim $HEADERS"
-alias showLast="vim $RESPONSE -c 'vsplit $JSON' -c 'split $HEADERS'"
-alias showLastNoPayload="vim -O $HEADERS $RESPONSE"
+alias setRequest="vim $REQUEST_CONFIG"
+alias showLast="vim $RESPONSE -c 'vsplit $REQUEST_CONFIG'"
+alias showLastNoPayload="vim -O $REQUEST_CONFIG $RESPONSE"
+alias reload="reloadConfig"
 
 # inspects current or a saved request
 showRequest() {
   if [ -z "$1" ]
   then
-    echo "\nHOST: $CURLY_HOST"
-    echo "PATH: $CURLY_PATH"
-    echo "HEADERS:"
-    cat $HEADERS
-
-    if [ -s $JSON ]
-    then
-      echo "\nPAYLOAD:"
-      cat $JSON
-    else
-      echo ""
-    fi
+    echo "\nCurrent Request Configuration:"
+    cat $REQUEST_CONFIG | jq '.'
   else
-    FILENAME="${1#history/}"
-    echo "\nHOST:"
-    cat hosts/$FILENAME'.string'
-    echo "PATH:"
-    cat paths/$FILENAME'.string'
-
-    echo "HEADERS:"
-    cat headers/$FILENAME'.list'
-
-    if [ -s payloads/$FILENAME'.json' ]
-    then
-      echo "\nPAYLOAD:"
-      cat payloads/$FILENAME'.json'
-    else
-      echo ""
+    # Check if argument starts with history/requests/
+    if [[ "$1" != history/requests/* ]]; then
+      echo "ERROR: Argument must start with 'history/requests/'"
+      echo "Usage: showRequest history/requests/YYYY-MM-DD/request_name.json"
+      return 1
+    fi
+    
+    # Remove the history/requests/ prefix
+    FILENAME="${1#history/requests/}"
+    
+    # Remove .json extension if present
+    FILENAME="${FILENAME%.json}"
+    
+    # Check if the request configuration exists
+    if [ ! -f "history/requests/$FILENAME.json" ]; then
+      echo "ERROR: Request configuration not found: history/requests/$FILENAME.json"
+      return 1
+    fi
+    
+    echo "\nSaved Request: $FILENAME"
+    echo "\nConfiguration:"
+    cat "history/requests/$FILENAME.json" | jq '.'
+    
+    # Show response if it exists and has content
+    if [ -s "history/responses/$FILENAME.json" ]; then
+      echo "\nResponse Preview:"
+      cat "history/responses/$FILENAME.json" | jq '.' | head -20
+      echo "..."
     fi
   fi
 }
 
 # saves request
 saveRequest() {
-  today=`date '+%Y-%m-%d'`
-  mkdir -p history/$today
-  mkdir -p headers/$today
-  mkdir -p payloads/$today
-  mkdir -p paths/$today
-  mkdir -p hosts/$today
-  mkdir -p responses/$today
-
   if [ -z "$1" ]
   then
+    # Auto-generate filename based on current request
+    today=`date '+%Y-%m-%d'`
+    mkdir -p history/requests/$today
+    mkdir -p history/responses/$today
+    
     host=$(echo $CURLY_HOST | sed -e 's/http[s]*\:\/.*\///g')
     FILENAME="$CURLY_ACTION--$host--${CURLY_PATH//\//.}"
+    
+    # Save the current request configuration
+    cp "$REQUEST_CONFIG" "history/requests/$today/$FILENAME.json"
+    
+    # Save the response if it exists and has content
+    if [ -s "$RESPONSE" ]; then
+      cp "$RESPONSE" "history/responses/$today/$FILENAME.json"
+    else
+      echo "{}" > "history/responses/$today/$FILENAME.json"
+    fi
+    
+    echo "\nSaved Request: $today/$FILENAME"
+    echo "  Config: history/requests/$today/$FILENAME.json"
+    echo "  Response: history/responses/$today/$FILENAME.json"
   else
-    FILENAME=$1
+    # Handle explicit filename argument
+    # Check if argument starts with history/requests/
+    if [[ "$1" != history/requests/* ]]; then
+      echo "ERROR: Argument must start with 'history/requests/'"
+      echo "Usage: saveRequest history/requests/YYYY-MM-DD/request_name.json"
+      return 1
+    fi
+    
+    # Remove the history/requests/ prefix
+    FILENAME="${1#history/requests/}"
+    
+    # Remove .json extension if present
+    FILENAME="${FILENAME%.json}"
+    
+    # Extract date directory from filename
+    date_dir=$(echo "$FILENAME" | cut -d'/' -f1)
+    
+    # Create directories
+    mkdir -p "history/requests/$date_dir"
+    mkdir -p "history/responses/$date_dir"
+    
+    # Save the current request configuration
+    cp "$REQUEST_CONFIG" "history/requests/$FILENAME.json"
+    
+    # Save the response if it exists and has content
+    if [ -s "$RESPONSE" ]; then
+      cp "$RESPONSE" "history/responses/$FILENAME.json"
+    else
+      echo "{}" > "history/responses/$FILENAME.json"
+    fi
+    
+    echo "\nSaved Request: $FILENAME"
+    echo "  Config: history/requests/$FILENAME.json"
+    echo "  Response: history/responses/$FILENAME.json"
   fi
-  touch history/$today/$FILENAME
-  cp $HEADERS headers/$today/$FILENAME'.list'
-  cp $JSON payloads/$today/$FILENAME'.json'
-  cp $RESPONSE responses/$today/$FILENAME'.json'
-  echo $CURLY_HOST > hosts/$today/$FILENAME'.string'
-  echo $CURLY_PATH > paths/$today/$FILENAME'.string'
-  echo "\nSaved Request: $today/$FILENAME"
 }
 
 # load request
 loadRequest() {
-  FILENAME="${1#history/}"
-  cp headers/$FILENAME'.list' $HEADERS
-  cp payloads/$FILENAME'.json' $JSON
-  cp responses/$FILENAME'.json' $RESPONSE
-  CURLY_HOST=$(cat hosts/$FILENAME'.string')
-  CURLY_PATH=$(cat paths/$FILENAME'.string')
+  # Check if argument starts with history/requests/
+  if [[ "$1" != history/requests/* ]]; then
+    echo "ERROR: Argument must start with 'history/requests/'"
+    echo "Usage: loadRequest history/requests/YYYY-MM-DD/request_name.json"
+    return 1
+  fi
+  
+  # Remove the history/requests/ prefix
+  FILENAME="${1#history/requests/}"
+  
+  # Remove .json extension if present
+  FILENAME="${FILENAME%.json}"
+  
+  # Check if the request configuration exists
+  if [ ! -f "history/requests/$FILENAME.json" ]; then
+    echo "ERROR: Request configuration not found: history/requests/$FILENAME.json"
+    return 1
+  fi
+  
+  # Load the request configuration
+  cp "history/requests/$FILENAME.json" "$REQUEST_CONFIG"
+  
+  # Load the response if it exists
+  if [ -f "history/responses/$FILENAME.json" ]; then
+    cp "history/responses/$FILENAME.json" "$RESPONSE"
+  else
+    echo "{}" > "$RESPONSE"
+  fi
+  
+  # Reload the configuration
+  loadRequestConfig
+  
   echo "\nLOADED: $FILENAME"
   showRequest
 }
 
 deleteRequest() {
   FILENAME="${1#history/}"
-  rm history/$FILENAME
-  rm headers/$FILENAME'.list'
+  rm history/requests/$FILENAME'.json'
   rm payloads/$FILENAME'.json'
   rm responses/$FILENAME'.json'
   rm paths/$FILENAME'.string'
@@ -119,22 +192,34 @@ deleteRequest() {
 
 eraseDay() {
   DAY="${1#history/}"
-  rm -r -f history/$DAY
-  rm -r -f headers/$DAY
-  rm -r -f payloads/$DAY
-  rm -r -f responses/$DAY
-  rm -r -f paths/$DAY
-  rm -r -f hosts/$DAY
+  
+  # Check if the date directory exists
+  if [ ! -d "history/requests/$DAY" ]; then
+    echo "ERROR: Date directory not found: history/requests/$DAY"
+    return 1
+  fi
+  
+  # Remove the entire date directory for both requests and responses
+  rm -rf "history/requests/$DAY"
+  rm -rf "history/responses/$DAY"
+  
   echo "\nErased: $DAY"
+  echo "  Removed: history/requests/$DAY"
+  echo "  Removed: history/responses/$DAY"
 }
 
 # clears current request
 clearRequest() {
-  cp .default_headers.list $HEADERS
-  rm $JSON && touch $JSON
+  cat > $REQUEST_CONFIG << EOF
+{
+  "host": "http://localhost:3000",
+  "path": "/",
+  "payload": {},
+  "headers": []
+}
+EOF
   rm $RESPONSE && touch $RESPONSE
-  CURLY_HOST=$host_default
-  CURLY_PATH=$path_default
+  loadRequestConfig
   echo "\nCleared Request Params"
   showRequest
 }
@@ -145,20 +230,24 @@ curlyReset() {
   read answer
   if echo "$answer" | grep -iq "^y"; then
     # clear current containers
-    cp .default_headers.list $HEADERS
-    rm $JSON && touch $JSON
+    cat > $REQUEST_CONFIG << EOF
+{
+  "host": "http://localhost:3000",
+  "path": "/",
+  "payload": {},
+  "headers": [
+    "Accept: application/json",
+    "Authorization: Basic aG9NRmlyeHJQWjFUNjBRcjpRdFNYOHRVdkdDbVVYZ0p6c1JEQ0dheVpOMGNPM2JSMw=="
+  ]
+}
+EOF
     rm $RESPONSE && touch $RESPONSE
     # clear history
-    /bin/rm -f -R headers/*
-    /bin/rm -f -R history/*
-    /bin/rm -R hosts/*
-    /bin/rm -R paths/*
-    /bin/rm -R payloads/*
-    /bin/rm -R responses/*
+    /bin/rm -f -R history/requests/*
+    /bin/rm -f -R history/responses/*
     # reset defaults
-    CURLY_HOST=$host_default
-    CURLY_PATH=$path_default
-    echo "\nReset RubyPost"
+    loadRequestConfig
+    echo "\nReset Curly"
     showRequest
   else
     echo "Canceled"
@@ -167,17 +256,24 @@ curlyReset() {
 
 loadHeaders() {
   headers=""
-  while read line ; do
-    headers=("${headers[@]} -H '$line'")
-  done < $HEADERS
+  jq -r '.headers[]?' $REQUEST_CONFIG 2>/dev/null | while read line ; do
+    if [ -n "$line" ]; then
+      headers=("${headers[@]} -H '$line'")
+    fi
+  done
   echo $headers
 }
 
 loadFormData() {
   data=""
-  while read line ; do
-    data=("${data[@]} --data-urlencode '$line'")
-  done < $DATA
+  # Convert JSON payload to form data if it exists and is not empty
+  if [ -n "$CURLY_PAYLOAD" ] && [ "$CURLY_PAYLOAD" != "{}" ]; then
+    echo "$CURLY_PAYLOAD" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' 2>/dev/null | while read line ; do
+      if [ -n "$line" ]; then
+        data=("${data[@]} --data-urlencode '$line'")
+      fi
+    done
+  fi
   echo $data
 }
 
@@ -190,11 +286,18 @@ post() {
   CURLY_PATH=$post_path
   POST_URL=$CURLY_HOST$CURLY_PATH
 
-  cmd="curl -d '@$JSON' $headers -X POST '$POST_URL'"
+  # Create temporary payload file from JSON config
+  temp_payload=$(mktemp)
+  echo "$CURLY_PAYLOAD" > "$temp_payload"
+
+  cmd="curl -d '@$temp_payload' $headers -X POST '$POST_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | jq . > $RESPONSE && showLast
   saveRequest
+  
+  # Clean up temp file
+  rm -f "$temp_payload"
 }
 
 # makes a get call with headers to the supplied url
@@ -239,27 +342,41 @@ put() {
   CURLY_PATH=$put_path
   PUT_URL=$CURLY_HOST$CURLY_PATH
 
-  cmd="curl -d '@$JSON' $headers -X PUT '$PUT_URL'"
+  # Create temporary payload file from JSON config
+  temp_payload=$(mktemp)
+  echo "$CURLY_PAYLOAD" > "$temp_payload"
+
+  cmd="curl -d '@$temp_payload' $headers -X PUT '$PUT_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | jq . > $RESPONSE && showLast
   saveRequest
+  
+  # Clean up temp file
+  rm -f "$temp_payload"
 }
 
-# makes a put call with headers and payload to the supplied url
+# makes a patch call with headers and payload to the supplied url
 patch() {
-  CURLY_ACTION="PUT"
+  CURLY_ACTION="PATCH"
   headers=`loadHeaders`
 
   patch_path=${1:-$CURLY_PATH}
   CURLY_PATH=$patch_path
   PATCH_URL=$CURLY_HOST$CURLY_PATH
 
-  cmd="curl -d '@$JSON' $headers -X PATCH '$PATCH_URL'"
+  # Create temporary payload file from JSON config
+  temp_payload=$(mktemp)
+  echo "$CURLY_PAYLOAD" > "$temp_payload"
+
+  cmd="curl -d '@$temp_payload' $headers -X PATCH '$PATCH_URL'"
 
   echo "\n"$cmd"\n"
   eval $cmd | jq . > $RESPONSE && showLast
   saveRequest
+  
+  # Clean up temp file
+  rm -f "$temp_payload"
 }
 
 # makes a delete call with headers and payload to the supplied url
@@ -282,8 +399,6 @@ postForm() {
   CURLY_ACTION="POST"
   headers=`loadHeaders`
 
-  # convert json to url-encoded format
-  cat $JSON | sed 's/[{}\" ,]//g;s/\:/=/g;/^[[:space:]]*$/d' > $DATA
   data=`loadFormData`
 
   post_path=${1:-$CURLY_PATH}
@@ -295,6 +410,11 @@ postForm() {
   echo "\n"$cmd"\n"
   eval $cmd | jq . > $RESPONSE && showLast
   saveRequest
+}
 
-  rm $DATA # remove temp file
+# Reload request config after changes
+reloadConfig() {
+  loadRequestConfig
+  echo "Request configuration reloaded"
+  showRequest
 }

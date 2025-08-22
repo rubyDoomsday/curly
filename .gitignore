@@ -1,13 +1,7 @@
 history/
-headers/
-payloads/
-responses/
-hosts/
-paths/
 
-_headers.list
-_payload.json
 _response.json
+_request_config.json
 *.csv
 
 config.json
