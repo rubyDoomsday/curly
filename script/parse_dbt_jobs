@@ -145,8 +145,8 @@ output_file="$OUTPUT_FILE"
 
 # Set default output filename if not provided
 if [ -z "$output_file" ]; then
-  timestamp=$(date +"%Y%m%d_%H%M%S")
-  output_file="dbt_jobs_audit/dbt_jobs_${account_id}_${timestamp}.csv"
+  date_stamp=$(date +"%Y%m%d")
+  output_file="dbt_jobs_audit/dbt_jobs_${account_id}_${date_stamp}.csv"
 fi
 
 # Create execution directory if it doesn't exist
@@ -154,8 +154,8 @@ mkdir -p dbt_jobs_audit
 
 # Generate timestamp for this run
 run_timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-timestamp=$(date +"%Y%m%d_%H%M%S")
-curl_log_file="dbt_jobs_audit/curl_request_${account_id}_${timestamp}.sh"
+date_stamp=$(date +"%Y%m%d")
+curl_log_file="dbt_jobs_audit/curl_request_${account_id}_${date_stamp}.sh"
 
 # Cleanup function to remove temporary files
 cleanup() {

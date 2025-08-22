@@ -125,8 +125,8 @@ output_file="$OUTPUT_FILE"
 
 # Set default output filename if not provided
 if [ -z "$output_file" ]; then
-  timestamp=$(date +"%Y%m%d_%H%M%S")
-  output_file="fivetran_connectors_audit/fivetran_connectors_${timestamp}.csv"
+  date_stamp=$(date +"%Y%m%d")
+  output_file="fivetran_connectors_audit/fivetran_connectors_${date_stamp}.csv"
 else
   # Ensure output file is in the fivetran_connectors_audit directory
   if [[ "$output_file" != fivetran_connectors_audit/* ]]; then
@@ -139,8 +139,8 @@ mkdir -p fivetran_connectors_audit
 
 # Generate timestamp for this run
 run_timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-timestamp=$(date +"%Y%m%d_%H%M%S")
-curl_log_file="fivetran_connectors_audit/curl_request_${timestamp}.sh"
+date_stamp=$(date +"%Y%m%d")
+curl_log_file="fivetran_connectors_audit/curl_request_${date_stamp}.sh"
 
 # Cleanup function to remove temporary files
 cleanup() {
