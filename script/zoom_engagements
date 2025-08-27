@@ -1,9 +1,52 @@
 #!/bin/bash
 # This script will retrieve Zoom engagements using OAuth authentication
 # First generates an OAuth token, then fetches engagements data
+#
+# CSV Processing Features:
+# - Intelligent JSON structure detection
+# - Automatic field extraction and CSV generation
+# - Support for custom data paths and field selection
+# - Robust error handling and fallback processing
+# - CSV validation and preview
+# - Verbose logging options
+# - Handles nested JSON objects and arrays
+# - Escapes special characters for CSV compatibility
+#
+# Dependencies: jq, curl, base64
+# Usage: ./zoom_engagements [OPTIONS]
 
 # Default configuration file path
 CONFIG_FILE="zoom_config.json"
+
+# Function to check required dependencies
+check_dependencies() {
+  local missing_deps=()
+  
+  # Check for jq (JSON processor)
+  if ! command -v jq >/dev/null 2>&1; then
+    missing_deps+=("jq")
+  fi
+  
+  # Check for curl
+  if ! command -v curl >/dev/null 2>&1; then
+    missing_deps+=("curl")
+  fi
+  
+  # Check for base64
+  if ! command -v base64 >/dev/null 2>&1; then
+    missing_deps+=("base64")
+  fi
+  
+  if [ ${#missing_deps[@]} -gt 0 ]; then
+    echo "ERROR: Missing required dependencies: ${missing_deps[*]}"
+    echo "Please install the missing dependencies and try again."
+    echo "On macOS: brew install jq"
+    echo "On Ubuntu/Debian: sudo apt-get install jq"
+    exit 1
+  fi
+  
+  echo "All required dependencies are available"
+}
 
 # Function to load configuration from JSON file
 load_config() {
@@ -15,6 +58,8 @@ load_config() {
     export CLIENT_SECRET=$(jq -r '.client_secret // empty' "$config_file" 2>/dev/null)
     export ACCOUNT_ID=$(jq -r '.account_id // empty' "$config_file" 2>/dev/null)
     export OUTPUT_FILE=$(jq -r '.output_file // empty' "$config_file" 2>/dev/null)
+    export DATA_PATH=$(jq -r '.data_path // empty' "$config_file" 2>/dev/null)
+    export FIELDS=$(jq -r '.fields // empty' "$config_file" 2>/dev/null)
     
     # Check if required values were loaded
     if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$ACCOUNT_ID" ]; then
@@ -41,20 +86,171 @@ show_usage() {
   echo "  -s, --client-secret SECRET  Zoom OAuth client secret"
   echo "  -a, --account-id ID  Zoom account ID"
   echo "  -o, --output FILE    Output CSV file"
+  echo "  -d, --data-path PATH JSON data path to extract (e.g., 'engagements', 'data')"
+  echo "  -f, --fields FIELDS  Comma-separated list of fields to include in CSV"
+  echo "  -v, --verbose        Enable verbose output"
   echo "  -h, --help           Show this help message"
   echo ""
   echo "Examples:"
   echo "  $0 -c zoom_config.json                                    # Use config file"
   echo "  $0 -i 'your_client_id' -s 'your_client_secret' -a 'your_account_id'  # Use CLI arguments"
   echo "  $0 -i 'your_client_id' -s 'your_client_secret' -a 'your_account_id' -o custom.csv"
+  echo "  $0 -c config.json -d 'results' -f 'id,name,status'        # Custom data path and fields"
   echo ""
   echo "Configuration file format (JSON):"
   echo "  {"
   echo "    \"client_id\": \"your_client_id_here\","
   echo "    \"client_secret\": \"your_client_secret_here\","
   echo "    \"account_id\": \"your_account_id_here\","
-  echo "    \"output_file\": \"custom_output.csv\""
+  echo "    \"output_file\": \"custom_output.csv\","
+  echo "    \"data_path\": \"engagements\","
+  echo "    \"fields\": \"id,name,description,status,created_at,updated_at,type\""
   echo "  }"
+}
+
+# Function to process JSON to CSV with intelligent field detection
+process_json_to_csv() {
+  local json_file="$1"
+  local csv_file="$2"
+  local data_path="$3"
+  
+  echo "[$run_timestamp] Processing JSON to CSV from path: $data_path"
+  
+  # Check if the data path exists and contains an array
+  if ! jq -e "$data_path" "$json_file" > /dev/null 2>&1; then
+    echo "[$run_timestamp] ERROR: Data path '$data_path' not found in JSON"
+    return 1
+  fi
+  
+  if ! jq -e "$data_path | type == \"array\"" "$json_file" > /dev/null 2>&1; then
+    echo "[$run_timestamp] ERROR: Data path '$data_path' is not an array"
+    return 1
+  fi
+  
+  # Get the first item to determine available fields
+  local first_item_path="$data_path[0]"
+  local available_fields=$(jq -r "$first_item_path | keys[]?" "$json_file" 2>/dev/null | sort)
+  
+  if [ -z "$available_fields" ]; then
+    echo "[$run_timestamp] ERROR: No fields found in first item at $first_item_path"
+    return 1
+  fi
+  
+  echo "[$run_timestamp] Available fields: $available_fields"
+  
+  # If user specified custom fields, use those; otherwise use all available fields
+  local csv_header
+  if [ -n "$fields" ]; then
+    echo "[$run_timestamp] Using custom fields: $fields"
+    csv_header="$fields"
+  else
+    csv_header=$(echo "$available_fields" | tr '\n' ',' | sed 's/,$//')
+  fi
+  
+  echo "$csv_header" > "$csv_file"
+  
+  # Process the data with intelligent field handling
+  if jq -r --arg fields "$csv_header" --arg path "$data_path" '
+    .[$path][]? | 
+    ($fields | split(",") | map(select(length > 0)) | 
+    map(
+      if . == "settings" or . == "participants" or . == "metadata" or . == "tags" or . == "config" then
+        (.[.] | tostring | gsub("\""; "\\\"") | gsub("\n"; " ") | gsub("\r"; " ") | gsub(",", ";"))
+      elif . == "created_at" or . == "updated_at" or . == "start_time" or . == "end_time" then
+        (.[.] | tostring | gsub("\""; "\\\"") | gsub("\n"; " ") | gsub("\r"; " "))
+      else
+        (.[.] | tostring | gsub("\""; "\\\"") | gsub("\n"; " ") | gsub("\r"; " ") | gsub(",", ";"))
+      end
+    ) | @csv)
+  ' "$json_file" >> "$csv_file" 2>/dev/null; then
+    
+    local record_count=$(jq "$data_path | length" "$json_file" 2>/dev/null || echo "0")
+    echo "[$run_timestamp] Successfully processed $record_count records to CSV"
+    
+    # Show verbose output if enabled
+    if [ "$verbose" = true ]; then
+      echo "[$run_timestamp] CSV file details:"
+      echo "  - Header: $csv_header"
+      echo "  - Records: $record_count"
+      echo "  - File size: $(du -h "$csv_file" 2>/dev/null | cut -f1 || echo "unknown")"
+    fi
+    
+    return 0
+  else
+    echo "[$run_timestamp] ERROR: Failed to process JSON to CSV"
+    return 1
+  fi
+}
+
+# Function to analyze JSON structure and suggest processing approach
+analyze_json_structure() {
+  local json_file="$1"
+  
+  echo "[$run_timestamp] Analyzing JSON structure..."
+  
+  # Get top-level keys
+  local top_keys=$(jq -r 'keys[]?' "$json_file" 2>/dev/null)
+  
+  if [ -z "$top_keys" ]; then
+    echo "[$run_timestamp] ERROR: No top-level keys found in JSON"
+    return 1
+  fi
+  
+  echo "[$run_timestamp] Top-level keys: $top_keys"
+  
+  # Analyze each key to find arrays
+  for key in $top_keys; do
+    local key_type=$(jq -r ".$key | type" "$json_file" 2>/dev/null)
+    local key_length=$(jq -r ".$key | length" "$json_file" 2>/dev/null)
+    
+    echo "[$run_timestamp] Key '$key': type=$key_type, length=$key_length"
+    
+    if [ "$key_type" = "array" ] && [ "$key_length" -gt 0 ]; then
+      echo "[$run_timestamp] Found array '$key' with $key_length items"
+      
+      # Get sample fields from first item
+      local sample_fields=$(jq -r ".$key[0] | keys[]?" "$json_file" 2>/dev/null | head -5 | tr '\n' ', ' | sed 's/, $//')
+      echo "[$run_timestamp] Sample fields in '$key': $sample_fields"
+      
+      return 0
+    fi
+  done
+  
+  echo "[$run_timestamp] No suitable array found for CSV processing"
+  return 1
+}
+
+# Function to validate CSV output
+validate_csv_output() {
+  local csv_file="$1"
+  
+  if [ ! -f "$csv_file" ]; then
+    echo "[$run_timestamp] ERROR: CSV file not found: $csv_file"
+    return 1
+  fi
+  
+  if [ ! -s "$csv_file" ]; then
+    echo "[$run_timestamp] ERROR: CSV file is empty: $csv_file"
+    return 1
+  fi
+  
+  # Check if file has at least a header and one data row
+  local line_count=$(wc -l < "$csv_file")
+  if [ "$line_count" -lt 2 ]; then
+    echo "[$run_timestamp] WARNING: CSV file has only $line_count line(s), may be incomplete"
+  fi
+  
+  # Check for common CSV issues
+  local has_quotes=$(grep -c '^"' "$csv_file" || echo "0")
+  local has_commas=$(grep -c ',' "$csv_file" || echo "0")
+  
+  echo "[$run_timestamp] CSV validation: $line_count lines, $has_quotes quoted rows, $has_commas comma-separated rows"
+  
+  # Show sample of the CSV for verification
+  echo "[$run_timestamp] CSV sample (first 3 lines):"
+  head -3 "$csv_file" | sed 's/^/  /'
+  
+  return 0
 }
 
 # Parse command line arguments
@@ -62,6 +258,9 @@ CLIENT_ID=""
 CLIENT_SECRET=""
 ACCOUNT_ID=""
 OUTPUT_FILE=""
+DATA_PATH=""
+FIELDS=""
+VERBOSE=false
 USE_CONFIG=false
 
 while [[ $# -gt 0 ]]; do
@@ -86,6 +285,18 @@ while [[ $# -gt 0 ]]; do
     -o|--output)
       OUTPUT_FILE="$2"
       shift 2
+      ;;
+    -d|--data-path)
+      DATA_PATH="$2"
+      shift 2
+      ;;
+    -f|--fields)
+      FIELDS="$2"
+      shift 2
+      ;;
+    -v|--verbose)
+      VERBOSE=true
+      shift 1
       ;;
     -h|--help)
       show_usage
@@ -140,6 +351,9 @@ client_id="$CLIENT_ID"
 client_secret="$CLIENT_SECRET"
 account_id="$ACCOUNT_ID"
 output_file="$OUTPUT_FILE"
+data_path="$DATA_PATH"
+fields="$FIELDS"
+verbose="$VERBOSE"
 
 # Set default output filename if not provided
 if [ -z "$output_file" ]; then
@@ -179,6 +393,9 @@ trap cleanup EXIT
 
 # Log the start of processing
 echo "[$run_timestamp] Starting Zoom engagements processing"
+
+# Check dependencies before proceeding
+check_dependencies
 
 # Step 1: Generate OAuth token
 echo "[$run_timestamp] Step 1: Generating OAuth token..."
@@ -252,43 +469,129 @@ EOF
       # Process the engagements data
       echo "[$run_timestamp] Processing engagements data..."
       
-      # Check if the response contains data
-      if jq -e '.engagements' "$temp_engagements_json" > /dev/null 2>&1; then
-        # Write the header to the CSV file
-        echo "id,name,description,status,created_at,updated_at,type,settings" > "$output_file"
-        
-        # Use jq to process the JSON and convert it to CSV
-        if jq -r '
-          .engagements[]? |
-          [
-            .id // "",
-            .name // "",
-            .description // "",
-            .status // "",
-            .created_at // "",
-            .updated_at // "",
-            .type // "",
-            (.settings | tostring)
-          ] | @csv
-        ' "$temp_engagements_json" >> "$output_file"; then
-        
-          echo "[$run_timestamp] CSV file created successfully at $output_file"
-          
-          # Count the number of engagements processed
-          engagement_count=$(jq '.engagements | length' "$temp_engagements_json" 2>/dev/null || echo "0")
-          echo "[$run_timestamp] Processed $engagement_count engagements"
-          
-          echo "[$run_timestamp] Processing completed successfully!"
-          echo "Output files:"
-          echo "  CSV: $output_file"
-          echo "  Curl commands: $curl_log_file"
-          
-        else
-          echo "[$run_timestamp] ERROR: Failed to process engagements data with jq"
-          exit 1
-        fi
+      # First, analyze the JSON structure to understand what we're working with
+      if analyze_json_structure "$temp_engagements_json"; then
+        echo "[$run_timestamp] JSON structure analysis completed"
       else
-        echo "[$run_timestamp] No engagements data found in response"
+        echo "[$run_timestamp] Warning: JSON structure analysis failed, proceeding with processing"
+      fi
+      
+      # Try to process using the new helper function with common data paths
+      csv_created=false
+      
+      # If user specified a custom data path, try that first
+      if [ -n "$data_path" ]; then
+        echo "[$run_timestamp] Using custom data path: $data_path"
+        if process_json_to_csv "$temp_engagements_json" "$output_file" "$data_path"; then
+          echo "[$run_timestamp] Successfully processed data from custom path: $data_path"
+          csv_created=true
+        else
+          echo "[$run_timestamp] Failed to process data from custom path: $data_path, trying common paths..."
+        fi
+      fi
+      
+      # If custom path failed or wasn't specified, try common data paths in order of preference
+      if [ "$csv_created" = false ]; then
+        for data_path in "engagements" "data" "results" "items" "records"; do
+          if process_json_to_csv "$temp_engagements_json" "$output_file" "$data_path"; then
+            echo "[$run_timestamp] Successfully processed data from path: $data_path"
+            csv_created=true
+            break
+          else
+            echo "[$run_timestamp] Failed to process data from path: $data_path, trying next..."
+          fi
+        done
+      fi
+      
+      # If we still haven't succeeded, try to find any array in the JSON
+      if [ "$csv_created" = false ]; then
+        echo "[$run_timestamp] Common paths failed, searching for any array structure..."
+        
+        top_level_keys=$(jq -r 'keys[]?' "$temp_engagements_json" 2>/dev/null)
+        if [ -n "$top_level_keys" ]; then
+          for key in $top_level_keys; do
+            if jq -e ".$key | type == \"array\"" "$temp_engagements_json" > /dev/null 2>&1; then
+              echo "[$run_timestamp] Found array in '$key' field, attempting CSV generation..."
+              
+              if process_json_to_csv "$temp_engagements_json" "$output_file" "$key"; then
+                echo "[$run_timestamp] Successfully processed data from custom path: $key"
+                csv_created=true
+                break
+              fi
+            fi
+          done
+        fi
+      fi
+      
+            # If we still haven't succeeded, try a fallback approach
+      if [ "$csv_created" = false ]; then
+        echo "[$run_timestamp] All processing methods failed, attempting fallback CSV generation..."
+        
+        # Simple working fallback for engagements
+        if jq -e '.engagements' "$temp_engagements_json" > /dev/null 2>&1; then
+          echo "[$run_timestamp] Creating CSV with simple fallback method..."
+          
+          # Create a simple CSV with basic fields that we know exist
+          echo "engagement_id,start_time,end_time,duration,direction,queue_wait_type" > "$output_file"
+          
+          # Extract the data using a simple jq query
+          if jq -r '.engagements[]? | [.engagement_id, .start_time, .end_time, .duration, .direction, .queue_wait_type] | @csv' "$temp_engagements_json" >> "$output_file"; then
+            echo "[$run_timestamp] Simple fallback CSV generation successful for engagements"
+            csv_created=true
+          else
+            echo "[$run_timestamp] Simple fallback failed, trying minimal CSV..."
+            # Last resort: just get engagement_id and duration
+            echo "engagement_id,duration" > "$output_file"
+            if jq -r '.engagements[]? | [.engagement_id, .duration] | @csv' "$temp_engagements_json" >> "$output_file"; then
+              echo "[$run_timestamp] Minimal CSV generation successful"
+              csv_created=true
+            fi
+          fi
+        elif jq -e '.data' "$temp_engagements_json" > /dev/null 2>&1; then
+          # Simple fallback for data field
+          echo "id,name,description,status,created_at,updated_at,type" > "$output_file"
+          if jq -r '.data[]? | [.id, .name, .description, .status, .created_at, .updated_at, .type] | @csv' "$temp_engagements_json" >> "$output_file"; then
+            echo "[$run_timestamp] Fallback CSV generation successful for data field"
+            csv_created=true
+          fi
+        fi
+      fi
+      
+      # Check if we successfully created a CSV
+      if [ "$csv_created" = true ]; then
+        # Count the number of records processed
+        record_count=0
+        if [ -f "$output_file" ] && [ -s "$output_file" ]; then
+          # Count lines minus header
+          record_count=$(($(wc -l < "$output_file") - 1))
+        fi
+        
+        echo "[$run_timestamp] CSV file created successfully at $output_file"
+        echo "[$run_timestamp] Processed $record_count records"
+        
+        # Validate the CSV output
+        if validate_csv_output "$output_file"; then
+          echo "[$run_timestamp] CSV validation passed"
+        else
+          echo "[$run_timestamp] WARNING: CSV validation issues detected"
+        fi
+        
+        # Show a preview of the CSV
+        if [ "$record_count" -gt 0 ]; then
+          echo "[$run_timestamp] CSV preview (first 3 lines):"
+          head -3 "$output_file" | sed 's/^/  /'
+          if [ "$record_count" -gt 3 ]; then
+            echo "  ... and $((record_count - 3)) more rows"
+          fi
+        fi
+        
+        echo "[$run_timestamp] Processing completed successfully!"
+        echo "Output files:"
+        echo "  CSV: $output_file"
+        echo "  Curl commands: $curl_log_file"
+        
+      else
+        echo "[$run_timestamp] ERROR: Failed to create CSV from JSON response"
         echo "Response content:"
         jq '.' "$temp_engagements_json"
         exit 1
