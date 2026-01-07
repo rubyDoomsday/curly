@@ -1,0 +1,446 @@
+#!/bin/bash
+# This script will update a user's license type in dbt Cloud
+# Uses dbt Cloud API v2: POST /api/v2/accounts/{account_id}/users/{user_id}/
+# Note: POST requires all data fields to be included in the request
+# Documentation: https://docs.getdbt.com/dbt-cloud/api-v2#/operations/Update%20User
+
+# Default configuration file path
+CONFIG_FILE="config/dbt_config.json"
+
+# Function to load configuration from JSON file
+load_config() {
+  local config_file="$1"
+  if [ -f "$config_file" ]; then
+    echo "Loading configuration from: $config_file"
+    # Use jq to extract values and export them as environment variables
+    export ACCOUNT_ID=$(jq -r '.account_id // empty' "$config_file" 2>/dev/null)
+    export BEARER_TOKEN=$(jq -r '.bearer_token // empty' "$config_file" 2>/dev/null)
+    
+    # Check if required values were loaded
+    if [ -z "$ACCOUNT_ID" ] || [ -z "$BEARER_TOKEN" ]; then
+      echo "ERROR: Required values 'account_id' and 'bearer_token' not found in config file"
+      exit 1
+    fi
+    
+    echo "Configuration loaded successfully"
+    return 0
+  else
+    return 1
+  fi
+}
+
+# Function to display usage information
+show_usage() {
+  echo "Usage: $0 [OPTIONS]"
+  echo ""
+  echo "This script updates a user's license type in dbt Cloud to either 'developer' or 'read-only'."
+  echo ""
+  echo "Options:"
+  echo "  -c, --config FILE    Use configuration file (default: $CONFIG_FILE)"
+  echo "  -a, --account ID     DBT Cloud account ID"
+  echo "  -t, --token TOKEN    DBT Cloud API bearer token"
+  echo "  -u, --user-id ID      User ID (required if email not provided)"
+  echo "  -e, --email EMAIL     User email address (required if user-id not provided)"
+  echo "  -l, --license TYPE    License type: 'developer' or 'read-only' (REQUIRED - must be provided)"
+  echo "  -d, --dry-run         Show what would be updated without making changes"
+  echo "  -v, --verbose         Show detailed output"
+  echo "  -h, --help            Show this help message"
+  echo ""
+  echo "Note: License type (-l) is REQUIRED and must be provided as a command-line argument."
+  echo "      It cannot be loaded from the configuration file."
+  echo ""
+  echo "Examples:"
+  echo "  $0 -c config/dbt_config.json -e user@example.com -l developer"
+  echo "  $0 -a 21744 -t 'your_token' -u 12345 -l read-only"
+  echo "  $0 -c config/dbt_config.json -e user@example.com -l developer --dry-run"
+  echo ""
+  echo "Configuration file format (JSON):"
+  echo "  {"
+  echo "    \"account_id\": \"21744\","
+  echo "    \"bearer_token\": \"your_token_here\""
+  echo "  }"
+}
+
+# Function to find user by email
+find_user_by_email() {
+  local account_id="$1"
+  local bearer_token="$2"
+  local email="$3"
+  local temp_users_file="$4"
+  
+  echo "[$run_timestamp] Searching for user with email: $email" >&2
+  
+  # Fetch all users
+  local http_code=$(curl -H 'Accept: application/json' \
+          -H "Authorization: Bearer $bearer_token" \
+          -X GET "https://cloud.getdbt.com/api/v2/accounts/$account_id/users/" \
+          -o "$temp_users_file" \
+          -s -w "%{http_code}")
+  
+  if [ "$http_code" = "200" ]; then
+    # Find user by email
+    local user_id=$(jq -r --arg email "$email" '.data[] | select(.email == $email) | .id' "$temp_users_file" 2>/dev/null)
+    
+    if [ -n "$user_id" ] && [ "$user_id" != "null" ]; then
+      echo "[$run_timestamp] Found user ID: $user_id for email: $email" >&2
+      echo "$user_id"
+      return 0
+    else
+      echo "[$run_timestamp] ERROR: User with email '$email' not found" >&2
+      return 1
+    fi
+  else
+    echo "[$run_timestamp] ERROR: Failed to fetch users from API. HTTP Status: $http_code" >&2
+    return 1
+  fi
+}
+
+# Function to get current user data
+get_user_data() {
+  local account_id="$1"
+  local bearer_token="$2"
+  local user_id="$3"
+  local temp_user_file="$4"
+  
+  echo "[$run_timestamp] Fetching current user data for user ID: $user_id"
+  
+  local http_code=$(curl -H 'Accept: application/json' \
+          -H "Authorization: Bearer $bearer_token" \
+          -X GET "https://cloud.getdbt.com/api/v2/accounts/$account_id/users/$user_id/" \
+          -o "$temp_user_file" \
+          -s -w "%{http_code}")
+  
+  if [ "$http_code" = "200" ]; then
+    echo "[$run_timestamp] Successfully fetched user data"
+    return 0
+  else
+    echo "[$run_timestamp] ERROR: Failed to fetch user data from API. HTTP Status: $http_code"
+    if [ -f "$temp_user_file" ]; then
+      echo "[$run_timestamp] Error response:"
+      jq '.' "$temp_user_file" 2>/dev/null || cat "$temp_user_file"
+    fi
+    return 1
+  fi
+}
+
+# Function to update user license
+update_user_license() {
+  local account_id="$1"
+  local bearer_token="$2"
+  local user_id="$3"
+  local license_type="$4"
+  local temp_user_file="$5"
+  local dry_run="$6"
+  
+  # Get current user data
+  if ! get_user_data "$account_id" "$bearer_token" "$user_id" "$temp_user_file"; then
+    return 1
+  fi
+  
+  # Extract current user data
+  local current_email=$(jq -r '.data.email' "$temp_user_file" 2>/dev/null)
+  
+  # Extract license from permissions array - permissions is an array with license_type field
+  # Structure: permissions[0].license_type
+  # Handle cases where permissions might be null, empty array, or have elements
+  local current_license=$(jq -r '
+    if .data.permissions and (.data.permissions | type) == "array" and (.data.permissions | length) > 0 then
+      .data.permissions[0].license_type // empty
+    else
+      empty
+    end
+  ' "$temp_user_file" 2>/dev/null)
+  
+  # If still empty, check if permissions exists but is null or empty
+  if [ -z "$current_license" ] || [ "$current_license" = "null" ]; then
+    local permissions_type=$(jq -r '.data.permissions | type' "$temp_user_file" 2>/dev/null)
+    if [ "$permissions_type" = "null" ] || [ "$permissions_type" = "array" ]; then
+      if [ "$verbose" = true ]; then
+        echo "[$run_timestamp] Debug: Permissions structure:"
+        jq '.data.permissions' "$temp_user_file" 2>/dev/null
+      fi
+      # Permissions is null or empty array - license is not set
+      current_license=""
+    fi
+  fi
+  
+  # Default to empty string if still not found
+  if [ -z "$current_license" ] || [ "$current_license" = "null" ]; then
+    current_license=""
+  fi
+  
+  echo "[$run_timestamp] Current user information:"
+  echo "  Email: $current_email"
+  echo "  Current License: ${current_license:-'(not set)'}"
+  echo "  Target License: $license_type"
+  
+  # If license is empty and verbose mode, show the JSON structure
+  if [ -z "$current_license" ] && [ "$verbose" = true ]; then
+    echo "[$run_timestamp] Debug: Full user JSON structure:"
+    jq '.data' "$temp_user_file" 2>/dev/null | head -30
+  fi
+  
+  # Compare licenses - handle empty string case
+  if [ -n "$current_license" ] && [ "$current_license" = "$license_type" ]; then
+    echo "[$run_timestamp] User already has license type '$license_type'. No update needed."
+    return 0
+  fi
+  
+  if [ "$dry_run" = true ]; then
+    echo "[$run_timestamp] DRY RUN: Would update user license from '${current_license:-(not set)}' to '$license_type'"
+    if [ "$verbose" = true ]; then
+      echo "[$run_timestamp] Debug: Current user JSON structure:"
+      jq '.data | {id, email, permissions}' "$temp_user_file" 2>/dev/null
+    fi
+    return 0
+  fi
+  
+  # Create update payload - POST requires all data fields
+  # Extract the full data object and update license_type in permissions array
+  # The API expects the user object structure with all required fields
+  # permissions is an array: [{license_type: "developer", state: 1}]
+  local update_payload=$(jq --arg license "$license_type" '
+    .data |
+    if .permissions and (.permissions | type) == "array" and (.permissions | length) > 0 and .permissions[0] then
+      .permissions[0].license_type = $license |
+      if .permissions[0].state == null then .permissions[0].state = 1 else . end
+    else
+      .permissions = [{license_type: $license, state: 1}]
+    end
+  ' "$temp_user_file" 2>/dev/null)
+  
+  # Create temporary file for update payload
+  local update_timestamp=$(date +%s)
+  local temp_update_file="temp_user_update_${user_id}_${update_timestamp}.json"
+  echo "$update_payload" > "$temp_update_file"
+  
+  if [ "$verbose" = true ]; then
+    echo "[$run_timestamp] Debug: Update payload:"
+    jq '.' "$temp_update_file" 2>/dev/null | head -20
+  fi
+  
+  echo "[$run_timestamp] Updating user license..."
+  
+  # Execute the update using POST (not PUT) - POST requires all data fields
+  local http_code=$(curl -H 'Accept: application/json' \
+          -H 'Content-Type: application/json' \
+          -H "Authorization: Bearer $bearer_token" \
+          -X POST "https://cloud.getdbt.com/api/v2/accounts/$account_id/users/$user_id/" \
+          -d @"$temp_update_file" \
+          -o "$temp_user_file" \
+          -s -w "%{http_code}")
+  
+  # Clean up temporary update file
+  rm -f "$temp_update_file"
+  
+  if [ "$http_code" = "200" ]; then
+    # Extract updated license from response - permissions is an array
+    local updated_license=$(jq -r '
+      if .data.permissions and (.data.permissions | type) == "array" and (.data.permissions | length) > 0 then
+        .data.permissions[0].license_type // empty
+      else
+        empty
+      end
+    ' "$temp_user_file" 2>/dev/null)
+    echo "[$run_timestamp] Successfully updated user license to: ${updated_license:-'(not set)'}"
+    return 0
+  else
+    echo "[$run_timestamp] ERROR: Failed to update user license. HTTP Status: $http_code"
+    if [ -f "$temp_user_file" ]; then
+      echo "[$run_timestamp] Error response:"
+      jq '.' "$temp_user_file" 2>/dev/null || cat "$temp_user_file"
+    fi
+    return 1
+  fi
+}
+
+# Parse command line arguments
+ACCOUNT_ID=""
+BEARER_TOKEN=""
+USER_ID=""
+USER_EMAIL=""
+LICENSE_TYPE=""
+DRY_RUN=false
+VERBOSE=false
+USE_CONFIG=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -c|--config)
+      CONFIG_FILE="$2"
+      USE_CONFIG=true
+      shift 2
+      ;;
+    -a|--account)
+      ACCOUNT_ID="$2"
+      shift 2
+      ;;
+    -t|--token)
+      BEARER_TOKEN="$2"
+      shift 2
+      ;;
+    -u|--user-id)
+      USER_ID="$2"
+      shift 2
+      ;;
+    -e|--email)
+      USER_EMAIL="$2"
+      shift 2
+      ;;
+    -l|--license)
+      LICENSE_TYPE="$2"
+      shift 2
+      ;;
+    -d|--dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    -v|--verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h|--help)
+      show_usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      show_usage
+      exit 1
+      ;;
+  esac
+done
+
+# Validate license type FIRST - it's always required and cannot come from config
+if [ -z "$LICENSE_TYPE" ]; then
+  echo "ERROR: License type (-l) is REQUIRED and must be provided as a command-line argument"
+  echo "Valid options: 'developer' or 'read-only'"
+  echo ""
+  show_usage
+  exit 1
+fi
+
+if [ "$LICENSE_TYPE" != "developer" ] && [ "$LICENSE_TYPE" != "read-only" ]; then
+  echo "ERROR: Invalid license type: $LICENSE_TYPE"
+  echo "Valid options: 'developer' or 'read-only'"
+  exit 1
+fi
+
+# Load configuration from file if requested
+if [ "$USE_CONFIG" = true ]; then
+  if load_config "$CONFIG_FILE"; then
+    echo "Using configuration from: $CONFIG_FILE"
+  else
+    echo "ERROR: Configuration file not found: $CONFIG_FILE"
+    echo "Please create a valid configuration file or use CLI arguments instead."
+    show_usage
+    exit 1
+  fi
+elif [ -n "$ACCOUNT_ID" ] || [ -n "$BEARER_TOKEN" ]; then
+  echo "Using CLI arguments for configuration"
+  if [ -z "$ACCOUNT_ID" ] || [ -z "$BEARER_TOKEN" ]; then
+    echo "ERROR: Both account_id (-a) and bearer_token (-t) are required when using CLI arguments"
+    show_usage
+    exit 1
+  fi
+else
+  echo "ERROR: No configuration method specified"
+  echo "Please either:"
+  echo "  1. Use a configuration file: $0 -c config/dbt_config.json"
+  echo "  2. Provide CLI arguments: $0 -a <account_id> -t <bearer_token>"
+  show_usage
+  exit 1
+fi
+
+# Validate required parameters
+if [ -z "$ACCOUNT_ID" ] || [ -z "$BEARER_TOKEN" ]; then
+  echo "ERROR: Both account_id and bearer_token are required"
+  show_usage
+  exit 1
+fi
+
+# Validate user identifier
+if [ -z "$USER_ID" ] && [ -z "$USER_EMAIL" ]; then
+  echo "ERROR: Either user_id (-u) or email (-e) is required"
+  show_usage
+  exit 1
+fi
+
+# Set variables for use in the script
+account_id="$ACCOUNT_ID"
+bearer_token="$BEARER_TOKEN"
+user_id="$USER_ID"
+user_email="$USER_EMAIL"
+license_type="$LICENSE_TYPE"
+dry_run="$DRY_RUN"
+verbose="$VERBOSE"
+
+# Generate timestamp for this run
+run_timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+timestamp=$(date +%s)
+
+# Create execution directory if it doesn't exist
+mkdir -p dbt_users_audit
+
+# Cleanup function to remove temporary files
+cleanup() {
+  local exit_code=$?
+  if [ -f "$temp_users_file" ]; then
+    rm -f "$temp_users_file"
+    echo "[$run_timestamp] Cleaned up temporary users JSON file: $temp_users_file"
+  fi
+  if [ -f "$temp_user_file" ]; then
+    rm -f "$temp_user_file"
+    echo "[$run_timestamp] Cleaned up temporary user JSON file: $temp_user_file"
+  fi
+  exit $exit_code
+}
+
+# Set trap to ensure cleanup runs on script exit (success or failure)
+trap cleanup EXIT
+
+# Log the start of processing
+echo "[$run_timestamp] Starting dbt Cloud user license update"
+if [ "$dry_run" = true ]; then
+  echo "[$run_timestamp] DRY RUN MODE: No changes will be made"
+fi
+
+# Create temporary files
+temp_users_file="temp_dbt_users_${account_id}_${timestamp}.json"
+temp_user_file="temp_dbt_user_${user_id:-unknown}_${timestamp}.json"
+
+# Find user if email provided but user_id not provided
+if [ -z "$user_id" ] && [ -n "$user_email" ]; then
+  found_user_id=$(find_user_by_email "$account_id" "$bearer_token" "$user_email" "$temp_users_file")
+  if [ $? -eq 0 ] && [ -n "$found_user_id" ]; then
+    # Strip whitespace and newlines from the captured user_id
+    user_id=$(echo "$found_user_id" | tr -d '\n\r' | xargs)
+    echo "[$run_timestamp] Using user ID: $user_id"
+  else
+    echo "[$run_timestamp] ERROR: Could not find user with email: $user_email"
+    exit 1
+  fi
+fi
+
+# Validate that we have a user_id before proceeding
+if [ -z "$user_id" ]; then
+  echo "[$run_timestamp] ERROR: User ID is required. Please provide either -u (user-id) or -e (email)"
+  exit 1
+fi
+
+# Update temp_user_file now that we have the actual user_id
+temp_user_file="temp_dbt_user_${user_id}_${timestamp}.json"
+
+# Update user license
+if update_user_license "$account_id" "$bearer_token" "$user_id" "$license_type" "$temp_user_file" "$dry_run"; then
+  echo "[$run_timestamp] Processing completed successfully!"
+  
+  if [ "$verbose" = true ] && [ -f "$temp_user_file" ]; then
+    echo "[$run_timestamp] Updated user data:"
+    jq '.data | {id, email, license_type: .permissions[0].license_type, permissions}' "$temp_user_file" 2>/dev/null
+  fi
+else
+  echo "[$run_timestamp] ERROR: Failed to update user license"
+  exit 1
+fi
+
